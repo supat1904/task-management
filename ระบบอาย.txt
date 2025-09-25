@@ -1,0 +1,1780 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบจัดการงาน (Task Management)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        :root {
+            --sidebar-width: 280px;
+        }
+        html {
+            scroll-behavior: smooth;
+        }
+        body {
+            font-family: 'Kanit', sans-serif;
+            background-color: #f0f4f8;
+            background-image: radial-gradient(#dbeafe 1px, transparent 1px);
+            background-size: 20px 20px;
+            overflow-x: hidden;
+        }
+        .main-content {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            display: flex;
+            align-items: flex-start;
+        }
+        .kanban-board {
+            display: flex;
+            gap: 1.5rem;
+            padding: 1.5rem;
+            min-height: calc(100vh - 120px);
+            align-items: flex-start;
+            width: max-content;
+        }
+        .kanban-column {
+            flex: 0 0 350px;
+            background-color: #eef2f5;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            max-height: calc(100vh - 180px);
+            display: flex;
+            flex-direction: column;
+            border-top: 4px solid;
+        }
+        .column-header {
+            padding: 1rem 1.25rem;
+            font-weight: 600;
+            color: #1a202c;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .task-list {
+            padding: 0.5rem 0.75rem 0.75rem;
+            overflow-y: auto;
+            flex-grow: 1;
+        }
+        .task-card {
+            background-color: white;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+            border-left: 5px solid;
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+        .task-card.status-completed {
+            opacity: 0.65;
+            background-color: #f9fafb;
+        }
+        .task-card.status-completed .task-card-content {
+            text-decoration: line-through;
+        }
+        .task-card:hover {
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+            transform: translateY(-3px);
+        }
+        .task-card-content {
+             cursor: grab;
+        }
+        .task-card-content:active { cursor: grabbing; }
+        .task-card.dragging {
+            opacity: 0.6;
+            transform: rotate(3deg);
+        }
+        .task-actions {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            display: flex;
+            gap: 4px;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+        .task-card:hover .task-actions {
+            opacity: 1;
+        }
+        .task-action-btn {
+            background: none; border: none; color: #9ca3af; cursor: pointer; width: 28px; height: 28px; font-size: 0.9rem; border-radius: 50%;
+            transition: all 0.2s ease; display: inline-flex; align-items: center; justify-content: center;
+        }
+        .task-action-btn:hover { color: #3b82f6; background-color: #eff6ff; }
+        .task-action-btn.delete:hover { color: #ef4444; background-color: #fee2e2; }
+        .task-action-btn.complete:hover, .task-action-btn.reopen:hover { color: #10b981; background-color: #f0fdf4; }
+        .task-action-btn.start:hover { color: #3b82f6; background-color: #eff6ff; }
+        .modal { transition: opacity 0.3s ease; z-index: 50; }
+        .task-count { background-color: #d1d5db; color: #4b5563; font-size: 0.75rem; font-weight: 500; padding: 0.125rem 0.5rem; border-radius: 9999px; }
+        .task-card .highlight-date { color: #c026d3; font-weight: 600; }
+        .task-card .highlight-money { color: #16a34a; font-weight: 600; background-color: #f0fdf4; padding: 0 4px; border-radius: 4px; }
+        .task-card .highlight-keyword { color: #be123c; font-weight: 600; }
+        .sidebar { position: fixed; top: 0; left: 0; height: 100%; width: var(--sidebar-width); background-color: #ffffff; box-shadow: 0 0 20px rgba(0, 0, 0, 0.1); transform: translateX(calc(var(--sidebar-width) * -1)); transition: transform 0.3s ease-in-out; z-index: 40; display: flex; flex-direction: column; }
+        .sidebar.open { transform: translateX(0); }
+        .sidebar-overlay { position: fixed; inset: 0; background-color: rgba(0, 0, 0, 0.5); z-index: 30; opacity: 0; transition: opacity 0.3s ease-in-out; pointer-events: none; }
+        .sidebar-overlay.open { opacity: 1; pointer-events: auto; }
+        .sidebar-menu { list-style: none; padding: 0; margin: 0; overflow-y: auto; }
+        .sidebar-menu a, .sidebar-menu-header { display: block; padding: 0.75rem 1.5rem; color: #374151; text-decoration: none; transition: background-color 0.2s; border-left: 4px solid transparent; }
+        .sidebar-menu a:hover { background-color: #f3f4f6; border-left-color: #3b82f6; }
+        .sidebar-menu-header { font-weight: 600; color: #6b7280; font-size: 0.875rem; padding-top: 1.5rem; padding-bottom: 0.5rem; text-transform: uppercase; }
+        .task-footer { margin-top: 0.75rem; display: flex; align-items: center; gap: 0.5rem; color: #6b7280; font-size: 0.8rem; }
+        .history-log { max-height: 200px; overflow-y: auto; background-color: #f9fafb; border-radius: 8px; padding: 0.75rem; margin-bottom: 1rem; border: 1px solid #e5e7eb;}
+        .history-item { padding: 0.5rem; border-bottom: 1px solid #f3f4f6; }
+        .history-item:last-child { border-bottom: none; }
+        .history-meta { font-size: 0.75rem; color: #6b7280; margin-bottom: 0.25rem; }
+        .attachment-list { list-style: none; padding: 0.5rem 0 0 0; margin: 0.5rem 0 0 0; border-top: 1px dashed #e5e7eb; }
+        .attachment-item a { color: #3b82f6; text-decoration: none; }
+        .attachment-item a:hover { text-decoration: underline; }
+        .task-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; padding-top: 0.75rem; margin-top: 0.75rem; border-top: 1px solid #f3f4f6; font-size: 0.8rem; }
+        .meta-item { display: flex; align-items: center; gap: 0.5rem; color: #4b5563; }
+        .meta-item i { color: #9ca3af; }
+        .new-badge { position: absolute; top: -8px; left: -8px; background-color: #2563eb; color: white; font-size: 0.7rem; font-weight: bold; padding: 2px 6px; border-radius: 9999px; transform: rotate(-15deg); box-shadow: 0 2px 4px rgba(0,0,0,0.2); z-index: 10; }
+        .view-toggle-btn { background-color: transparent; border: 1px solid #d1d5db; color: #4b5563; padding: 0.5rem 1rem; border-radius: 0.5rem; transition: all 0.2s ease-in-out; }
+        .view-toggle-btn.active { background-color: #3b82f6; color: white; border-color: #3b82f6; box-shadow: 0 4px 6px rgba(59, 130, 246, 0.2); }
+        .stat-card { background-color: white; padding: 1.5rem; border-radius: 0.75rem; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); transition: all 0.2s ease; cursor: pointer; }
+        .stat-card:hover { transform: translateY(-5px); box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1); }
+        .details-section {
+            display: none;
+            font-size: 0.8rem;
+            color: #6b7280;
+            background-color: #f9fafb;
+            padding: 0.75rem;
+            margin-top: 0.5rem;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            border-left: 3px solid;
+        }
+        @media print {
+            body * { visibility: hidden; }
+            #print-area, #print-area * { visibility: visible; }
+            #print-area { position: absolute; left: 0; top: 0; width: 100%; }
+            #userInputSection, .modal .flex.items-center.justify-end {
+                display: none !important;
+            }
+            #userAddedContentForPrint {
+                display: block !important;
+            }
+            @page { size: A4; margin: 20mm; }
+        }
+    </style>
+</head>
+<body>
+    <aside id="sidebar" class="sidebar"><div class="p-4 flex justify-between items-center border-b"><h2 class="text-xl font-bold text-gray-800">เมนูนำทาง</h2><button id="closeSidebarBtn" class="text-gray-500 hover:text-gray-800"><i class="fa-solid fa-times fa-lg"></i></button></div><nav id="sidebarMenu" class="sidebar-menu flex-grow"></nav><div class="p-4 border-t mt-auto"> <h3 class="sidebar-menu-header !p-0 !pb-2">จัดการข้อมูล</h3> <div class="space-y-2"> <button id="backupDataBtn" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center gap-2"> <i class="fa-solid fa-download"></i> สำรองข้อมูล </button> <button id="restoreDataBtn" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg flex items-center justify-center gap-2"> <i class="fa-solid fa-upload"></i> กู้คืนข้อมูล </button> <input type="file" id="restoreFileInput" class="hidden" accept=".json"> </div> </div></aside>
+    <div id="sidebarOverlay" class="sidebar-overlay"></div>
+    <header class="bg-white shadow-md p-4 flex justify-between items-center sticky top-0 z-20">
+        <div class="flex items-center gap-4">
+            <button id="openSidebarBtn" class="text-gray-600 hover:text-blue-500"><i class="fa-solid fa-bars fa-xl"></i></button>
+            <div class="hidden sm:flex items-center gap-2" id="viewToggle">
+                <button class="view-toggle-btn active flex items-center gap-2" data-view="dashboard"><i class="fa-solid fa-chart-pie"></i>แดชบอร์ด</button>
+                <button class="view-toggle-btn flex items-center gap-2" data-view="agenda"><i class="fa-solid fa-calendar-day"></i>ตารางงาน</button>
+                <button class="view-toggle-btn flex items-center gap-2" data-view="kanban"><i class="fa-solid fa-list-check"></i>บอร์ดจัดการงาน</button>
+            </div>
+        </div>
+        <div class="flex items-center gap-4">
+            <button id="openTrashBtn" class="text-gray-500 hover:text-red-500 transition-colors duration-200"><i class="fa-solid fa-trash-can fa-lg"></i></button>
+            <button id="addTaskBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105 flex items-center gap-2"><i class="fa-solid fa-plus"></i> เพิ่มงานใหม่</button>
+        </div>
+    </header>
+    
+    <main>
+        <div id="dashboardView">
+             <div class="p-6">
+                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+                      <div class="stat-card" data-filter="pending"> <h3 class="text-gray-500 font-medium">รอดำเนินการ</h3> <p id="pendingTasks" class="text-3xl font-bold text-gray-800">0</p> </div>
+                      <div class="stat-card" data-filter="in-progress"> <h3 class="text-gray-500 font-medium">กำลังดำเนินการ</h3> <p id="inProgressTasks" class="text-3xl font-bold text-blue-500">0</p> </div>
+                      <div class="stat-card" data-filter="urgent"> <h3 class="text-gray-500 font-medium">งานด่วน</h3> <p id="urgentTasks" class="text-3xl font-bold text-red-500">0</p> </div>
+                      <div class="stat-card" data-filter="completed"> <h3 class="text-gray-500 font-medium">งานเสร็จแล้ว</h3> <p id="completedTasks" class="text-3xl font-bold text-green-500">0</p> </div>
+                 </div>
+                 <div class="bg-white p-6 rounded-lg shadow-lg">
+                     <h2 class="text-xl font-bold mb-4 text-gray-700">สัดส่วนประเภทงาน</h2>
+                     <div class="max-w-xl mx-auto"><canvas id="taskChart"></canvas></div>
+                 </div>
+             </div>
+        </div>
+        <div id="agendaView" class="hidden p-6 w-full">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                <!-- Overdue Column -->
+                <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <h2 class="text-lg font-bold text-red-700 flex items-center gap-2 mb-3"><i class="fa-solid fa-circle-exclamation"></i> งานที่เกินกำหนด</h2>
+                    <ul id="overdueList" class="space-y-2"></ul>
+                </div>
+                <!-- Today Column -->
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <h2 class="text-lg font-bold text-blue-700 flex items-center gap-2 mb-3"><i class="fa-solid fa-star"></i> ต้องทำวันนี้</h2>
+                    <ul id="dueTodayList" class="space-y-2"></ul>
+                </div>
+                <!-- Tomorrow Column -->
+                <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                    <h2 class="text-lg font-bold text-gray-700 flex items-center gap-2 mb-3"><i class="fa-solid fa-arrow-right"></i> งานวันพรุ่งนี้</h2>
+                    <ul id="dueTomorrowList" class="space-y-2"></ul>
+                </div>
+            </div>
+             <div class="bg-white p-4 rounded-lg shadow-md">
+                 <h2 class="text-lg font-bold text-gray-700 flex items-center gap-2 mb-3"><i class="fa-solid fa-calendar-week"></i> กำหนดการอื่นๆ</h2>
+                 <ul id="upcomingList" class="space-y-2"></ul>
+            </div>
+        </div>
+        <div id="kanbanView" class="hidden">
+            <div class="main-content">
+                <div id="kanbanBoard" class="kanban-board"></div>
+                <div class="p-6 self-start">
+                    <button id="addCategoryBtn" class="bg-white/80 hover:bg-white text-gray-600 font-semibold py-2 px-4 rounded-lg shadow-md w-[350px] h-20 border-2 border-dashed border-gray-300 hover:border-blue-500 transition-all duration-200 flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-plus"></i> เพิ่มประเภทงานใหม่
+                    </button>
+                </div>
+            </div>
+        </div>
+         <div id="filteredKanbanView" class="hidden p-6 w-full">
+             <button id="backToDashboardBtn" class="mb-4 bg-white hover:bg-gray-100 text-gray-800 font-semibold py-2 px-4 border border-gray-300 rounded-lg shadow-sm flex items-center gap-2">
+                 <i class="fa-solid fa-arrow-left"></i> กลับไปที่แดชบอร์ด
+             </button>
+             <div id="filteredKanbanContent"></div>
+         </div>
+    </main>
+    
+    <!-- Modals -->
+    <div id="taskModal" class="modal fixed inset-0 bg-gray-600 bg-opacity-50 hidden overflow-y-auto py-12"> <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg mx-auto"> <h2 class="text-xl font-bold mb-4" id="modalTitle">เพิ่มงานใหม่</h2> <form id="taskForm"> <input type="hidden" id="editTaskIndices"> <div class="mb-4"> <label for="taskContent" class="block text-gray-700 text-sm font-bold mb-2">รายละเอียดงาน:</label> <textarea id="taskContent" rows-4 class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" required></textarea> </div> <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4"> <div> <label for="taskAssigner" class="block text-gray-700 text-sm font-bold mb-2">ผู้มอบหมาย:</label> <input type="text" id="taskAssigner" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="ระบุชื่อ..."> </div> <div> <label for="taskCoordinator" class="block text-gray-700 text-sm font-bold mb-2">ผู้ประสานงาน:</label> <input type="text" id="taskCoordinator" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="ระบุชื่อ..."> </div> </div> <div class="mb-4"> <div class="flex justify-between items-center mb-2"> <label for="taskCategorySelect" class="block text-gray-700 text-sm font-bold">เลือกประเภทโปรเจกต์:</label> <button type="button" id="addNewCategoryFromModalBtn" class="text-blue-500 hover:text-blue-700 text-sm font-semibold flex items-center gap-1"><i class="fa-solid fa-plus"></i>สร้างใหม่</button> </div> <select id="taskCategorySelect" class="shadow border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500"></select> </div> <div class="mb-4"> <label class="block text-gray-700 text-sm font-bold mb-2">สถานะ:</label> <div class="grid grid-cols-3 gap-2" id="taskStatus"> <label class="flex items-center justify-center p-2 border rounded-lg gap-2 cursor-pointer transition-all duration-200"><input type="radio" name="status" value="pending" class="hidden peer" checked> <i class="fa-solid fa-hourglass-start text-gray-400 peer-checked:text-blue-600"></i> <span class="peer-checked:text-blue-600 font-semibold">รอดำเนินการ</span></label> <label class="flex items-center justify-center p-2 border rounded-lg gap-2 cursor-pointer transition-all duration-200"><input type="radio" name="status" value="in-progress" class="hidden peer"> <i class="fa-solid fa-person-digging text-gray-400 peer-checked:text-blue-600"></i> <span class="peer-checked:text-blue-600 font-semibold">กำลังดำเนินการ</span></label> <label class="flex items-center justify-center p-2 border rounded-lg gap-2 cursor-pointer transition-all duration-200"><input type="radio" name="status" value="completed" class="hidden peer"> <i class="fa-solid fa-check-circle text-gray-400 peer-checked:text-blue-600"></i> <span class="peer-checked:text-blue-600 font-semibold">เสร็จสิ้น</span></label> </div> </div> <div class="mb-4"> <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" id="isUrgentCheckbox" class="form-checkbox h-5 w-5"> <span class="font-bold text-red-500"><i class="fa-solid fa-fire"></i> เป็นงานด่วน</span></label> </div> <div class="flex items-center justify-end gap-3"> <button type="button" id="cancelBtn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-lg">ยกเลิก</button> <button type="submit" id="saveTaskBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2"><i class="fa-solid fa-save"></i>บันทึก</button> </div> </form> </div> </div>
+    <div id="taskDetailModal" class="modal fixed inset-0 bg-gray-600 bg-opacity-50 hidden overflow-y-auto py-12"> <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-2xl mx-auto"> <div class="flex justify-between items-center mb-2"> <h2 class="text-xl font-bold text-gray-800" id="detailModalTitle">รายละเอียดงาน</h2> <div class="flex items-center gap-2"> <button id="printSummaryBtn" class="text-gray-500 hover:text-blue-600"><i class="fa-solid fa-print"></i> พิมพ์/สรุป</button> <button id="deleteTaskFromDetailBtn" class="text-gray-500 hover:text-red-500 transition-colors duration-200 flex items-center gap-1 text-sm py-1 px-2 rounded-md hover:bg-red-50"><i class="fa-solid fa-trash-can"></i> ลบงาน</button> <button id="closeDetailModalBtn" class="text-gray-500 hover:text-gray-800 text-3xl leading-none">&times;</button> </div> </div> <div id="detailModalMeta" class="mb-4 border-b pb-4"></div> <div class="mb-4"> <input type="hidden" id="detailTaskIndices"> <h3 class="text-lg font-semibold text-gray-700 mb-2">เช็คลิสต์</h3> <div id="checklistProgress" class="mb-2"></div> <ul id="checklistView" class="space-y-2 mb-3 max-h-40 overflow-y-auto pr-2"></ul> <form id="addChecklistItemForm" class="space-y-2"> <div> <div class="flex items-center gap-2"> <input type="text" id="newChecklistItemText" class="flex-grow shadow-sm border rounded py-1 px-2 text-sm" placeholder="เพิ่มรายการใหม่..." required> <input type="date" id="newChecklistItemDueDate" class="shadow-sm border rounded py-1 px-2 text-sm"> <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-1 px-3 rounded-md text-sm shrink-0">เพิ่ม</button> </div> </div> <div> <textarea id="newChecklistItemDescription" class="w-full shadow-sm border rounded py-1 px-2 text-sm" rows="2" placeholder="รายละเอียด (ถ้ามี)..."></textarea> </div> </form> </div> </div> </div>
+    <div id="trashModal" class="modal fixed inset-0 bg-gray-600 bg-opacity-50 hidden overflow-y-auto py-12"> <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-2xl mx-auto"> <div class="flex justify-between items-center mb-4 border-b pb-3"> <h2 class="text-xl font-bold text-gray-700 flex items-center gap-3"><i class="fa-solid fa-trash-can"></i>ถังขยะ</h2> <button id="closeTrashBtn" class="text-gray-500 hover:text-gray-800 text-3xl leading-none">&times;</button> </div> <div id="trashList" class="max-h-[60vh] overflow-y-auto"></div> </div> </div>
+    <div id="newCategoryModal" class="modal fixed inset-0 bg-gray-600 bg-opacity-70 flex items-center justify-center hidden"> <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm mx-auto"> <h2 class="text-xl font-bold mb-4">สร้างประเภทงานใหม่</h2> <form id="newCategoryForm"> <div class="mb-4"> <label for="newCategoryName" class="block text-gray-700 text-sm font-bold mb-2">ชื่อประเภทงาน:</label> <input type="text" id="newCategoryName" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" required> </div> <div class="flex items-center justify-end gap-3"> <button type="button" id="cancelNewCategoryBtn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-lg">ยกเลิก</button> <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">บันทึก</button> </div> </form> </div> </div>
+    <div id="completeChecklistItemModal" class="modal fixed inset-0 bg-gray-600 bg-opacity-70 flex items-center justify-center hidden z-[60]"> <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg mx-auto"> <h2 class="text-xl font-bold mb-2">ยืนยันการปิดรายการ</h2> <p id="completeChecklistItemName" class="text-gray-600 mb-4"></p> <form id="completeChecklistItemForm"> <input type="hidden" id="completeChecklistItemIndices"> <div class="mb-4"> <label for="completionDetailsText" class="block text-gray-700 text-sm font-bold mb-2">รายละเอียดการปิดงาน:</label> <textarea id="completionDetailsText" rows="3" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="อธิบายผลการดำเนินงาน..."></textarea> </div> <div class="mb-4"> <label for="completionDetailsAttachments" class="block text-gray-700 text-sm font-bold mb-2">แนบไฟล์หลักฐาน (ถ้ามี):</label> <input type="file" id="completionDetailsAttachments" multiple class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"/> </div> <div class="flex items-center justify-end gap-3"> <button type="button" id="cancelCompleteChecklistItemBtn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-lg">ยกเลิก</button> <button type="submit" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg">ยืนยันการปิดงาน</button> </div> </form> </div> </div>
+    <div id="updateItemModal" class="modal fixed inset-0 bg-gray-600 bg-opacity-70 flex items-center justify-center hidden z-[60]"> <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg mx-auto"> <h2 class="text-xl font-bold mb-2">อัพเดตความคืบหน้า</h2> <p id="updateItemName" class="text-gray-600 mb-4"></p> <form id="updateItemForm"> <input type="hidden" id="updateItemIndices"> <div class="mb-4"> <label class="block text-gray-700 text-sm font-bold mb-2">ประเภทการอัพเดต:</label> <div class="flex gap-4 p-2 bg-gray-50 rounded-lg"> <label class="flex-1 flex items-center justify-center p-2 border rounded-lg gap-2 cursor-pointer transition-all duration-200 has-[:checked]:bg-blue-100 has-[:checked]:border-blue-400"> <input type="radio" name="updateType" value="update" class="hidden peer" checked> <i class="fa-solid fa-info-circle text-gray-400 peer-checked:text-blue-600"></i> <span class="peer-checked:text-blue-600 font-semibold"> ความคืบหน้า</span> </label> <label class="flex-1 flex items-center justify-center p-2 border rounded-lg gap-2 cursor-pointer transition-all duration-200 has-[:checked]:bg-red-100 has-[:checked]:border-red-400"> <input type="radio" name="updateType" value="issue" class="hidden peer"> <i class="fa-solid fa-triangle-exclamation text-gray-400 peer-checked:text-red-600"></i> <span class="peer-checked:text-red-600 font-semibold"> แจ้งปัญหา</span> </label> </div> </div> <div class="mb-4"> <label for="updateItemText" class="block text-gray-700 text-sm font-bold mb-2">รายละเอียด:</label> <textarea id="updateItemText" rows="3" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" required placeholder="อธิบายความคืบหน้า หรือปัญหาที่พบ..."></textarea> </div> <div class="mb-4"> <label for="updateItemAttachments" class="block text-gray-700 text-sm font-bold mb-2">แนบไฟล์ (ถ้ามี):</label> <input type="file" id="updateItemAttachments" multiple class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"/> </div> <div class="flex items-center justify-end gap-3"> <button type="button" id="cancelUpdateItemBtn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-lg">ยกเลิก</button> <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">บันทึก</button> </div> </form> </div> </div>
+    <div id="editCompletionModal" class="modal fixed inset-0 bg-gray-600 bg-opacity-70 flex items-center justify-center hidden z-[60]"> <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg mx-auto"> <h2 class="text-xl font-bold mb-2">แก้ไขข้อมูลการปิดงาน</h2> <p id="editCompletionItemName" class="text-gray-600 mb-4"></p> <form id="editCompletionForm"> <input type="hidden" id="editCompletionItemIndices"> <div class="mb-4"> <label for="editCompletionDueDate" class="block text-gray-700 text-sm font-bold mb-2">แก้ไขวันครบกำหนด:</label> <input type="date" id="editCompletionDueDate" class="shadow-sm border rounded w-full py-2 px-3 text-sm"> </div> <div class="mb-4"> <label for="editCompletionDetailsText" class="block text-gray-700 text-sm font-bold mb-2">แก้ไขรายละเอียดการปิดงาน:</label> <textarea id="editCompletionDetailsText" rows="3" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea> </div> <div class="mb-4"> <label for="editCompletionAttachments" class="block text-gray-700 text-sm font-bold mb-2">แก้ไขไฟล์แนบ:</label> <input type="file" id="editCompletionAttachments" multiple class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"/> <div id="currentAttachments" class="text-xs text-gray-500 mt-1"></div> </div> <div class="mb-4"> <label for="editReason" class="block text-gray-700 text-sm font-bold mb-2">เหตุผลในการแก้ไข:</label> <textarea id="editReason" rows="2" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" required placeholder="กรุณาระบุเหตุผล..."></textarea> </div> <div class="flex items-center justify-end gap-3"> <button type="button" id="cancelEditCompletionBtn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-lg">ยกเลิก</button> <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">บันทึกการแก้ไข</button> </div> </form> </div> </div>
+    <div id="editChecklistItemModal" class="modal fixed inset-0 bg-gray-600 bg-opacity-70 flex items-center justify-center hidden z-[60]"> <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg mx-auto"> <h2 class="text-xl font-bold mb-4">แก้ไขรายการเช็คลิสต์</h2> <form id="editChecklistItemForm"> <input type="hidden" id="editChecklistItemIndices"> <div class="mb-4"> <label for="editChecklistItemText" class="block text-gray-700 text-sm font-bold mb-2">ชื่อรายการ:</label> <input type="text" id="editChecklistItemText" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" required> </div> <div class="mb-4"> <label for="editChecklistItemDescription" class="block text-gray-700 text-sm font-bold mb-2">รายละเอียด:</label> <textarea id="editChecklistItemDescription" rows="3" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea> </div> <div class="flex items-center justify-end gap-3"> <button type="button" id="cancelEditChecklistItemBtn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-lg">ยกเลิก</button> <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">บันทึก</button> </div> </form> </div> </div>
+    <div id="summaryModal" class="modal fixed inset-0 bg-gray-600 bg-opacity-50 hidden overflow-y-auto py-12 z-[60]"> <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-3xl mx-auto"> <div id="print-area"> <div class="border-b-2 pb-4 mb-4"> <h2 class="text-2xl font-bold" id="summaryModalTitle">สรุปรายงานผลการดำเนินงาน</h2> <p class="text-gray-500" id="summaryTaskCategory"></p> </div> <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 text-center"> <div id="summaryTimeToStart"></div> <div id="summaryActiveDuration"></div> <div id="summaryStatus"></div> </div> <div id="summaryContent" class="space-y-4"></div> <div id="userInputSection"> <div class="mt-6"> <h3 class="font-bold text-lg mb-2">รายละเอียดเพิ่มเติม (สำหรับพิมพ์และส่งออก)</h3> <textarea id="summaryEditable" class="w-full h-24 shadow appearance-none border rounded py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="เพิ่มบันทึกหรือรายละเอียดเพิ่มเติมที่นี่..."></textarea> </div> <div class="mt-4"> <label for="summaryAttachments" class="block text-gray-700 text-sm font-bold mb-2">แนบไฟล์ (สำหรับอ้างอิงในเอกสาร):</label> <input type="file" id="summaryAttachments" multiple class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"/> <div id="summaryAttachmentList" class="mt-2 text-xs text-gray-500 space-y-1"></div> </div> </div> <div id="userAddedContentForPrint" class="hidden"></div> </div> <div class="flex items-center justify-end gap-3 mt-4"> <button type="button" id="copySummaryBtn" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg">คัดลอก</button> <button type="button" id="exportSummaryBtn" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2"><i class="fa-solid fa-file-export"></i>ส่งออก</button> <button type="button" id="printBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">พิมพ์</button> <button type="button" id="cancelSummaryBtn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-lg">ปิด</button> </div> </div> </div>
+    <div id="notificationModal" class="modal fixed inset-0 bg-gray-600 bg-opacity-70 flex items-center justify-center hidden z-[70]"> <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4 text-center transform transition-all duration-300 scale-95 opacity-0"> <i class="fa-solid fa-bell text-yellow-400 text-5xl mb-4 animate-bounce"></i> <h2 class="text-2xl font-bold mb-4">การแจ้งเตือนประจำวัน</h2> <div class="space-y-3 text-lg"> <p>คุณมี <strong id="notificationUrgentCount" class="text-red-500">0</strong> งานด่วนที่ต้องจัดการ</p> <p>และมี <strong id="notificationTodayCount" class="text-blue-500">0</strong> งานที่ต้องทำวันนี้</p> </div> <div class="flex items-center justify-center gap-4 mt-6"> <button id="closeNotificationBtn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-6 rounded-lg">ปิด</button> <button id="goToAgendaBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-6 rounded-lg flex items-center gap-2"> <i class="fa-solid fa-calendar-day"></i> ไปที่ตารางงาน </button> </div> </div> </div>
+
+    <script>
+        const initialData = {
+            categories: [
+                { title: 'งานทั่วไป', tasks: [
+                    { content: 'อัพเดทไฟล์ใบงาน', assigner: '', coordinator: '', history: [], isNew: true, status: 'completed', isUrgent: false, createdAt: '2025-09-24T10:00:00.000Z', startedAt: '2025-09-24T16:48:00.000Z', completedAt: '2025-09-24T16:49:00.000Z', checklist: [
+                        {text: "ดึงใบงานถึง 16.49", completed: true, dueDate: "2025-09-24", description: "", isUrgent: false, completionDetails: {text: "เรียบร้อย ณ เวลา 16.49", attachments: [], timestamp: "24/09/2025 16:49"}, updates: []}
+                    ]},
+                    { content: 'รีมายด์งาน รพ.ราชพิพัฒน์', assigner: '', coordinator: 'พี่มิ้ม', history: [], isNew: true, status: 'pending', isUrgent: false, createdAt: '2025-09-24T11:00:00.000Z', checklist: [
+                        {text: "รีมายด์ 2 งาน", completed: false, dueDate: "2025-09-24", description: "", isUrgent: false, updates: []}
+                    ]},
+                    { content: 'ประสานงาน ผู้สูงอายุบางขุนเทียน', assigner: '', coordinator: '', history: [], isNew: true, status: 'pending', isUrgent: false, createdAt: '2025-09-24T11:05:00.000Z', checklist: [
+                        {text: "ติดต่อประสานงาน", completed: false, dueDate: "2025-09-24", description: "", isUrgent: false, updates: []}
+                    ]}
+                ]},
+                { title: 'งานติดตาม', tasks: [
+                    { content: 'All Things Emergency: ติดตามใบเสร็จค่าบูธ', assigner: 'พี่แหม่ม', coordinator: 'เตย', history: [], isNew: true, status: 'in-progress', isUrgent: true, createdAt: '2025-09-15T09:00:00.000Z', startedAt: '2025-09-16T10:00:00.000Z', checklist: [
+                        {text: "ติดตามใบเสร็จ 50,000 บาท (โอน 16.09.68)", completed: false, dueDate: "2025-09-25", description: "", isUrgent: true, updates: []}
+                    ]},
+                    { content: 'TSVIR 2025: ติดตามใบเสร็จ', assigner: 'พี่แหม่ม', coordinator: 'เมด ไอคอน', history: [], isNew: true, status: 'pending', isUrgent: false, createdAt: '2025-08-22T09:00:00.000Z', checklist: [
+                        {text: "ใบเสร็จค่าบูธ 80,000 (จ่าย 22.08.68)", completed: false, dueDate: "2025-09-25", description: "", isUrgent: false, updates: []},
+                        {text: "ใบเสร็จค่าห้องพัก นพ.สิริฤทธิ์ 13,500 (จ่าย 18.09.68)", completed: false, dueDate: "2025-09-25", description: "รร millenniumHilton bangkok", isUrgent: false, updates: []}
+                    ]},
+                    { content: 'ROU: ติดตามใบเสร็จ', assigner: 'พี่แหม่ม', coordinator: 'สมาคม', history: [], isNew: true, status: 'pending', isUrgent: false, createdAt: '2025-07-22T09:00:00.000Z', checklist: [
+                        {text: "ใบเสร็จค่าห้องพัก 8,000 (โอน 22.7.68)", completed: false, dueDate: "2025-09-25", description: "", isUrgent: false, updates: []},
+                        {text: "ใบเสร็จค่าบูธ 50,000 (โอน 22.7.68)", completed: false, dueDate: "2025-09-25", description: "", isUrgent: false, updates: []}
+                    ]},
+                    { content: 'A-PHPB: ติดตามใบเสร็จ Workshop', assigner: 'พี่แหม่ม', coordinator: '', history: [], isNew: true, status: 'pending', isUrgent: false, createdAt: '2025-07-23T09:00:00.000Z', checklist: [
+                        {text: "แพทย์ขอนแก่น 25,993 (จ่าย 23.07.68)", completed: false, dueDate: "2025-09-25", description: "", isUrgent: false, updates: []},
+                        {text: "แพทย์รพ.สรรพสิทธิประสงค์ 26,216.90 (จ่าย 29.07.68)", completed: false, dueDate: "2025-09-25", description: "", isUrgent: false, updates: []}
+                    ]},
+                     { content: 'Endo/Andro 2025: ติดตามใบเสร็จ', assigner: 'พี่แหม่ม', coordinator: 'Booking/รร.', history: [], isNew: true, status: 'pending', isUrgent: false, createdAt: '2025-07-11T09:00:00.000Z', checklist: [
+                        {text: "ใบกำกับภาษี Booking ห้องพี่ผึ้ง พี่พี", completed: false, dueDate: "2025-09-25", description: "รร.แจ้งว่าขอได้ก่อนวันเช็คอิน", isUrgent: false, updates: []},
+                        {text: "ใบเสร็จค่าบูธ (เมดโฟ 1, โปรฟาวด์ 1)", completed: false, dueDate: "2025-09-25", description: "ชำระ 16.7.68", isUrgent: false, updates: []}
+                    ]},
+                     { content: 'IASGO Thailand 2025: ติดตามใบเสร็จ', assigner: 'พี่แหม่ม', coordinator: 'สมาคม', history: [], isNew: true, status: 'pending', isUrgent: false, createdAt: '2025-08-15T09:00:00.000Z', checklist: [
+                        {text: "ใบเสร็จ 60,000 (ชำระ 15.08.68)", completed: false, dueDate: "2025-09-25", description: "", isUrgent: false, updates: []}
+                    ]},
+                     { content: '7th USAM 2025: ติดตามใบเสร็จ', assigner: 'พี่แหม่ม', coordinator: 'เมดโฟกัส', history: [], isNew: true, status: 'pending', isUrgent: false, createdAt: '2025-08-29T09:00:00.000Z', checklist: [
+                        {text: "ใบเสร็จค่าบูธ 60,000 (จ่าย 29.08.68)", completed: false, dueDate: "2025-09-25", description: "", isUrgent: false, updates: []}
+                    ]},
+                     { content: 'RCOT 2/2025: ติดตามใบเสร็จ', assigner: 'พี่แหม่ม', coordinator: 'สมาคม', history: [], isNew: true, status: 'pending', isUrgent: false, createdAt: '2025-08-29T09:00:00.000Z', checklist: [
+                        {text: "ใบเสร็จ 40,000 (ชำระ 29.8.68)", completed: false, dueDate: "2025-09-20", description: "", isUrgent: false, updates: []}
+                    ]},
+                     { content: 'TUMISS: ติดตามใบเสร็จ', assigner: 'พี่แหม่ม', coordinator: 'สมาคม', history: [], isNew: true, status: 'pending', isUrgent: false, createdAt: '2025-09-10T09:00:00.000Z', checklist: [
+                        {text: "ใบเสร็จค่าบูธ โปรฟาวด์ 25,000 (ชำระ 10.09.68)", completed: false, dueDate: "2025-09-20", description: "", isUrgent: false, updates: []},
+                         {text: "ใบเสร็จค่าบูธ เมดโฟกัส 25,000 (ชำระ 12.09.68)", completed: false, dueDate: "2025-09-20", description: "", isUrgent: false, updates: []}
+                    ]},
+                     { content: 'ยูโรส่วนภูมิภาค ครั้งที่ 10: ติดตามใบเสร็จ', assigner: 'พี่แหม่ม', coordinator: 'สมาคม', history: [], isNew: true, status: 'pending', isUrgent: false, createdAt: '2025-09-10T09:00:00.000Z', checklist: [
+                        {text: "ใบเสร็จค่าบูธ โปรฟาวด์ 35,000 (ชำระ 10.09.68)", completed: false, dueDate: "2025-09-20", description: "", isUrgent: false, updates: []},
+                         {text: "ใบเสร็จค่าบูธ เมดโฟกัส 35,000 (ชำระ 12.09.68)", completed: false, dueDate: "2025-09-20", description: "", isUrgent: false, updates: []}
+                    ]}
+                ]},
+                { title: 'งานประชุม', tasks: [
+                    { content: 'RCOT (7-9 ต.ค. 68)', assigner: 'พี่ผึ้ง', coordinator: 'พี่ผึ้ง', history: [], isNew: true, status: 'in-progress', isUrgent: false, createdAt: '2025-08-13T09:00:00.000Z', startedAt: '2025-09-15T10:00:00.000Z', checklist: [
+                        {text: "แจ้งความประสงค์ Workshop", completed: true, dueDate: "2025-09-15", description: "หมดเขต 15 ก.ย. 68", isUrgent: false, completionDetails: {text:"เสร็จสิ้นแล้ว", attachments:[], timestamp: "15/09/2025 10:00"}, updates: []},
+                        {text: "แจ้งพี่ผึ้งเรื่องลงทะเบียน", completed: false, dueDate: "2025-09-30", description: "รีมาย 30.09.68", isUrgent: false, updates: []}
+                    ]},
+                    { content: 'TSVIR 2025 (9-11 ต.ค. 68)', assigner: 'พี่นก/พี่มิ้ม', coordinator: 'คุณนุ้ย', history: [], isNew: true, status: 'in-progress', isUrgent: false, createdAt: '2025-09-01T09:00:00.000Z', startedAt: '2025-09-23T10:00:00.000Z', checklist: [
+                        {text: "ประชุมเลือกตำแหน่งบูธ (ได้ S5)", completed: true, dueDate: "2025-09-23", description: "พี่มิ้มลาป่วย", isUrgent: false, completionDetails: {text:"ได้บูธ S5", attachments:[], timestamp: "23/09/2025 10:00"}, updates: []},
+                        {text: "ชำระค่าลงทะเบียน", completed: false, dueDate: "2025-09-25", description: "รออินวอย / ตั้งเบิก / เซ็นอนุมัติ / โอน / ส่งสลิป / ติดตามใบเสร็จ", isUrgent: false, updates: []},
+                        {text: "นำส่งแบบฟอร์มรายละเอียดให้ผู้จัดงาน", completed: false, dueDate: "2025-10-01", description: "", isUrgent: false, updates: []}
+                    ]},
+                    { content: 'Southern Urology Society 2025 (12 ต.ค. 25)', assigner: 'พี่พี', coordinator: 'พี่อู๋/พี่นก', history: [], isNew: true, status: 'in-progress', isUrgent: false, createdAt: '2025-09-17T09:00:00.000Z', startedAt: '2025-09-18T10:00:00.000Z', checklist: [
+                        {text: "จองบูธและส่งแบบตอบรับ", completed: true, dueDate: "2025-09-18", description: "พี่พีเซ็นอนุมัติ", isUrgent: false, completionDetails:{text:"ส่งอีเมลแล้ว", attachments:[], timestamp:"18/09/2025 10:00"}, updates: []},
+                        {text: "ตั้งเบิกค่าบูธ", completed: false, dueDate: "2025-09-29", description: "", isUrgent: false, updates: []},
+                        {text: "ขอเอกสารเช็คลิสจากพี่อู๋ BU1 (โปรฟาวด์)", completed: false, dueDate: "2025-09-22", description: "ได้รับไฟล์แสกน COOK แล้ว", isUrgent: false, updates: []},
+                        {text: "ขอเอกสารเช็คลิสจากพี่นก BU2", completed: false, dueDate: "2025-09-24", description: "", isUrgent: false, updates: []}
+                    ]},
+                    { content: '7th USAM (20-21 ต.ค. 68)', assigner: 'พี่นก', coordinator: 'พี่นก/พี่โอปอ', history: [], isNew: true, status: 'pending', isUrgent: false, createdAt: '2025-09-01T09:00:00.000Z', checklist: [
+                        {text: "ติดตามเช็คลิสต์จากพี่นก", completed: false, dueDate: "2025-10-01", description: "ได้รับตัวจริงของพี่โอปอแล้ว", isUrgent: false, updates: []},
+                        {text: "รีมายด์พี่นกเรื่องลงทะเบียน (ไม่มีลงฟรี)", completed: false, dueDate: "2025-10-03", description: "", isUrgent: false, updates: []}
+                    ]},
+                    { content: 'Endo/Andro 2025 (23-24 ต.ค. 68)', assigner: 'พี่ผึ้ง', coordinator: 'พี่มิ้ม', history: [], isNew: true, status: 'pending', isUrgent: false, createdAt: '2025-07-18T09:00:00.000Z', checklist: [
+                        {text: "รีมายด์พี่มิ้มเรื่องเช็คลิสต์", completed: false, dueDate: "2025-10-01", description: "", isUrgent: false, updates: []},
+                        {text: "ทำเรื่องตั้งเบิกค่าบูธ", completed: false, dueDate: "", description: "รออินวอย", isUrgent: false, updates: []}
+                    ]},
+                    { content: 'A-PHPBA 2025 (28-31 ต.ค. 68)', assigner: 'พี่เติร์ด', coordinator: 'SV/ปลื้ม', history: [], isNew: true, status: 'pending', isUrgent: false, createdAt: '2025-09-24T09:00:00.000Z', checklist: [
+                        {text: "ติดตามดีไซน์ก่อสร้างบูธจากพี่เติร์ด", completed: false, dueDate: "2025-09-30", description: "", isUrgent: false, updates: []},
+                        {text: "ตั้งเบิกค่ากระแสไฟฟ้า", completed: false, dueDate: "", description: "รออินวอยแก้ไข", isUrgent: false, updates: []}
+                    ]},
+                    { content: 'TUMISS (30-31 ต.ค. 68)', assigner: 'พี่พี', coordinator: 'พั้นธ์', history: [], isNew: true, status: 'pending', isUrgent: false, createdAt: '2025-09-15T09:00:00.000Z', checklist: [
+                        {text: "ติดตามเช็คลิสต์จากพั้นธ์", completed: false, dueDate: "", description: "รอพี่พีเซ็น", isUrgent: false, updates: []}
+                    ]},
+                    { content: 'All Things Emergency (17-18 พ.ย. 68)', assigner: 'พี่นก', coordinator: 'เตย', history: [], isNew: true, status: 'in-progress', isUrgent: false, createdAt: '2025-09-12T09:00:00.000Z', startedAt: '2025-09-12T10:00:00.000Z', checklist: [
+                        {text: "จองบูธ", completed: true, dueDate: "2025-09-12", isUrgent: false, completionDetails:{text:"จองแล้ว", attachments:[], timestamp:"12/09/2025 10:00"}, updates: []},
+                        {text: "ตั้งเบิกค่าบูธ", completed: true, dueDate: "2025-09-16", isUrgent: false, completionDetails:{text:"พี่แหม่มโอนแล้ว", attachments:[], timestamp:"16/09/2025"}, updates: []},
+                        {text: "รีมายเช็คลิสต์พี่นก", completed: false, dueDate: "2025-09-25", description: "", isUrgent: false, updates: []},
+                        {text: "ติดตามกำหนดการของงานจากเตย", completed: false, dueDate: "", description: "", isUrgent: false, updates: []}
+                    ]},
+                    { content: 'IASGO Thailand 2025 (22-23 พ.ย. 25)', assigner: 'พี่มิ้ม', coordinator: '', history: [], isNew: true, status: 'pending', isUrgent: false, createdAt: '2025-08-26T09:00:00.000Z', checklist: [
+                        {text: "ติดตามเช็คลิสต์พี่มิ้ม", completed: false, dueDate: "2025-09-26", description: "", isUrgent: false, updates: []}
+                    ]},
+                    { content: 'ROU (29-30 พ.ย. 68)', assigner: 'พี่นก', coordinator: 'พี่โอปอ', history: [], isNew: true, status: 'pending', isUrgent: false, createdAt: '2025-09-01T09:00:00.000Z', checklist: [
+                        {text: "ติดตามเช็คลิสต์พี่นก", completed: false, dueDate: "2025-09-25", description: "ได้รับตัวจริงของพี่โอปอแล้ว", isUrgent: false, updates: []},
+                        {text: "รีมายพี่นกเรื่องจับฉลากบูธ", completed: false, dueDate: "2025-10-06", description: "จับฉลากวันที่ 8 ต.ค. 68", isUrgent: false, updates: []}
+                    ]},
+                    { content: 'CMU Neurosurgery Forum 2025 (8-9 ธ.ค. 68)', assigner: 'พี่แหม่ม', coordinator: 'พี่ปาล์ม/พี่นก', history: [], isNew: true, status: 'pending', isUrgent: false, createdAt: '2025-09-01T09:00:00.000Z', checklist: [
+                        {text: "แจ้งพี่แหม่มตั้งเบิกค่าบูธ", completed: false, dueDate: "2025-11-10", description: "กำหนดชำระ 15.11.68", isUrgent: false, updates: []},
+                        {text: "รีมายเช็คลิสต์พี่ปาล์ม/พี่นก", completed: false, dueDate: "2025-09-25", description: "ของพี่ปาล์มได้ไฟล์แล้ว", isUrgent: false, updates: []}
+                    ]},
+                    { content: 'NORTHERN URO CONNECTION (NUC) 2025 (11-12 ธ.ค. 68)', assigner: 'พี่แหม่ม', coordinator: 'พี่แจ็ค/พี่นก', history: [], isNew: true, status: 'pending', isUrgent: false, createdAt: '2025-09-01T09:00:00.000Z', checklist: [
+                        {text: "ตั้งเบิกค่าบูธ", completed: false, dueDate: "2025-11-01", description: "", isUrgent: false, updates: []},
+                        {text: "รีมายเช็คลิสต์พี่แจ็ค/พี่นก", completed: false, dueDate: "2025-09-25", description: "ของพี่แจ็คได้ไฟล์แล้ว", isUrgent: false, updates: []}
+                    ]},
+                     { content: '11th MS FORUM 2025 (20-21 ธ.ค. 25)', assigner: 'พี่ผึ้ง', coordinator: '', history: [], isNew: true, status: 'pending', isUrgent: false, createdAt: '2025-09-16T09:00:00.000Z', checklist: [
+                        {text: "รีมายแจ้งข่าวงานประชุมกับพี่ผึ้ง", completed: false, dueDate: "2025-09-24", description: "", isUrgent: false, updates: []}
+                    ]},
+                     { content: '4th TSHNO Annual conference (8-9 ธ.ค. 68)', assigner: 'พี่นก/พี่ผึ้ง', coordinator: 'คุณสมพร', history: [], isNew: true, status: 'pending', isUrgent: false, createdAt: '2025-10-30T09:00:00.000Z', checklist: [
+                        {text: "คุยกับพี่ผึ้งว่าจะให้ส่งแบบฟอร์มไปก่อนไหม", completed: false, dueDate: "", description: "คุณสมพรแจ้งรอหลัง 30.10.68", isUrgent: false, updates: []}
+                    ]},
+                    { content: 'ประชุมวิชาการ “ยูโรส่วนภูมิภาค ครั้งที่ 10” (29-30 ม.ค. 69)', assigner: '', coordinator: 'พั้นธ์', history: [], isNew: true, status: 'pending', isUrgent: false, createdAt: '2025-08-29T09:00:00.000Z', checklist: [
+                        {text: "ติดตามเช็คลิสต์จากพั้นธ์", completed: false, dueDate: "2025-09-30", description: "", isUrgent: false, updates: []}
+                    ]},
+                     { content: 'ประชุมวิชาการประจำปี 2569 (2-4 มี.ค 69)', assigner: 'พี่ผึ้ง', coordinator: '', history: [], isNew: true, status: 'pending', isUrgent: false, createdAt: '2025-09-18T09:00:00.000Z', checklist: [
+                        {text: "รีมายอีเมลพี่ผึ้ง", completed: false, dueDate: "2025-09-24", description: "", isUrgent: false, updates: []}
+                    ]}
+                ]},
+                { title: 'งานจัดบูธ', tasks: [
+                    { content: 'เตรียมบูธ RCOT (7-9 ต.ค. 68)', assigner: '', coordinator: 'SV', history: [], isNew: true, status: 'pending', isUrgent: false, createdAt: '2025-09-19T09:00:00.000Z', checklist: [
+                        {text: "ส่งข้อมูลให้ SV", completed: false, dueDate: "", description: "", isUrgent: false, updates: []},
+                        {text: "เตรียม Exhibition และ จัดของ", completed: false, dueDate: "", description: "", isUrgent: false, updates: []},
+                        {text: "ทำใบปะหน้ากล่อง", completed: false, dueDate: "", description: "", isUrgent: false, updates: []}
+                    ]},
+                     { content: 'เตรียมบูธ TSVIR 2025 (9-11 ต.ค. 68)', assigner: '', coordinator: 'SV/ปลื้ม', history: [], isNew: true, status: 'pending', isUrgent: false, createdAt: '2025-09-23T09:00:00.000Z', checklist: [
+                        {text: "ส่งข้อมูลให้ SV", completed: false, dueDate: "", description: "", isUrgent: false, updates: []},
+                        {text: "ลงเบรคดร๊อปให้ปลื้ม", completed: false, dueDate: "", description: "", isUrgent: false, updates: []},
+                        {text: "เตรียม Exhibition และ จัดของ", completed: false, dueDate: "", description: "", isUrgent: false, updates: []},
+                        {text: "ทำใบปะหน้ากล่อง", completed: false, dueDate: "", description: "", isUrgent: false, updates: []}
+                    ]}
+                ]},
+                { title: 'ใบเสนอราคา', tasks: [
+                    { content: 'รพ.เกษมราษฎร์: ขอข้อมูลและใบเสนอราคา', assigner: '', coordinator: 'พี่นก', history: [], isNew: true, status: 'pending', isUrgent: false, createdAt: '2025-09-24T09:00:00.000Z', checklist: [
+                        {text: "รอพี่นกดูข้อมูล", completed: false, dueDate: "", description: "", isUrgent: false, updates: []}
+                    ]}
+                ]},
+                { title: 'วีซ่า', tasks: [
+                    { content: 'ดำเนินการเรื่องวีซ่า', assigner: '', coordinator: 'เตย', history: [], isNew: true, status: 'pending', isUrgent: false, createdAt: '2025-09-24T09:00:00.000Z', checklist: [
+                        {text: "ตั้งเบิกค่าวีซ่า + ค่าประกัน", completed: false, dueDate: "", description: "แสกนได้แต่ของเตย", isUrgent: false, updates: []}
+                    ]}
+                ]},
+                { title: 'จองห้องพัก', tasks: [
+                     { content: 'จองห้องพัก นพ.สิริฤทธิ์ (งาน TSVIR)', assigner: '', coordinator: '', history: [], isNew: true, status: 'completed', isUrgent: false, createdAt: '2025-09-18T09:00:00.000Z', startedAt: '2025-09-18T10:00:00.000Z', completedAt: '2025-09-18T11:00:00.000Z', checklist: [
+                        {text: "จองห้องพัก รพ.จุรีเวช", completed: true, dueDate: "2025-09-18", description: "ชำระเงินแล้ว 13,500 วันที่ 18.09.68", isUrgent: false, completionDetails: {text:"ชำระแล้ว", attachments: [], timestamp: "18/09/2025"}, updates: []}
+                    ]},
+                     { content: 'จองโรงแรมให้ นพ.มานพ', assigner: 'พี่ผึ้ง', coordinator: 'พี่แหม่ม', history: [], isNew: true, status: 'in-progress', isUrgent: false, createdAt: '2025-09-23T09:00:00.000Z', startedAt: '2025-09-23T10:00:00.000Z', checklist: [
+                        {text: "ทำเรื่องตั้งเบิก", completed: false, dueDate: "2025-09-23", description: "รร. มิราเคิล สุวรรณภูมิ แอร์พอร์ต", isUrgent: false, updates: []}
+                    ]}
+                ]},
+                 { title: 'สั่งทำ/อื่นๆ', tasks: [
+                    { content: 'สั่งทำกระเป๋า', assigner: 'พี่ผึ้ง', coordinator: 'ร้านอินดีทีเชิต', history: [], isNew: true, status: 'in-progress', isUrgent: false, createdAt: '2025-09-19T09:00:00.000Z', startedAt: '2025-09-22T10:00:00.000Z', checklist: [
+                        {text: "ส่งแบบให้ร้าน", completed: true, dueDate: "2025-09-22", isUrgent: false, completionDetails:{text:"เลือกร้านแล้ว", attachments:[], timestamp:"22/09/2025 10:00"}, updates: []},
+                        {text: "ส่งโลโก้ให้พี่ผึ้งดูก่อน", completed: false, dueDate: "2025-09-24", description: "พี่ผึ้งอยากได้ logo ทุกยี่ห้อ มากระจาย บนกระเป๋า", isUrgent: false, updates: []}
+                    ]},
+                    { content: 'สั่งทำอะคริลิคแขวน Stent (cook)', assigner: 'พี่พี', coordinator: 'ร้านควอลิตี้', history: [], isNew: true, status: 'in-progress', isUrgent: false, createdAt: '2025-09-19T09:00:00.000Z', startedAt: '2025-09-19T10:00:00.000Z', checklist: [
+                        {text: "คอนเฟิร์มสั่งทำของ", completed: false, dueDate: "", description: "รอคุยกับพี่พีใหม่", isUrgent: false, updates: []},
+                        {text: "ตั้งเบิก", completed: false, dueDate: "", description: "", isUrgent: false, updates: []}
+                    ]},
+                    { content: 'สั่งทำ Backdrop 2 งาน (พั้นธ์)', assigner: 'พั้นธ์', coordinator: 'พี่บุ๊ค', history: [], isNew: true, status: 'completed', isUrgent: false, createdAt: '2025-09-15T09:00:00.000Z', startedAt: '2025-09-17T10:00:00.000Z', completedAt: '2025-09-18T10:00:00.000Z', checklist: [
+                        {text: "ติดตามไฟล์จากพั้นธ์", completed: true, dueDate: "2025-09-18", isUrgent: false, completionDetails:{text:"เรียบร้อย", attachments:[], timestamp:"18/09/2025 10:00"}, updates: []}
+                    ]},
+                    { content: 'สั่งทำ Backdrop 2 งาน (พี่มิ้ม)', assigner: 'พี่มิ้ม', coordinator: 'พี่บุ๊ค/พี่ผึ้ง', history: [], isNew: true, status: 'pending', isUrgent: false, createdAt: '2025-09-17T09:00:00.000Z', checklist: [
+                        {text: "รีมายพี่ผึ้ง/พี่บุ๊ค (RCST)", completed: false, dueDate: "2025-09-25", description: "", isUrgent: false, updates: []},
+                        {text: "รีมายพี่ผึ้ง (TSVIR)", completed: false, dueDate: "2025-09-25", description: "", isUrgent: false, updates: []}
+                    ]}
+                ]}
+            ],
+            trash: []
+        };
+
+        const COLORS = ['#3b82f6', '#f97316', '#8b5cf6', '#10b981', '#ef4444', '#14b8a6', '#6366f1', '#ec4899'];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- Element Selectors ---
+            const kanbanBoard = document.getElementById('kanbanBoard');
+            const taskModal = document.getElementById('taskModal');
+            const trashModal = document.getElementById('trashModal');
+            const newCategoryModal = document.getElementById('newCategoryModal');
+            const completeChecklistItemModal = document.getElementById('completeChecklistItemModal');
+            const updateItemModal = document.getElementById('updateItemModal');
+            const editCompletionModal = document.getElementById('editCompletionModal');
+            const editChecklistItemModal = document.getElementById('editChecklistItemModal');
+            const summaryModal = document.getElementById('summaryModal');
+            const addTaskBtn = document.getElementById('addTaskBtn');
+            const addCategoryBtn = document.getElementById('addCategoryBtn');
+            const addNewCategoryFromModalBtn = document.getElementById('addNewCategoryFromModalBtn');
+            const cancelBtn = document.getElementById('cancelBtn');
+            const openTrashBtn = document.getElementById('openTrashBtn');
+            const closeTrashBtn = document.getElementById('closeTrashBtn');
+            const trashList = document.getElementById('trashList');
+            const taskForm = document.getElementById('taskForm');
+            const newCategoryForm = document.getElementById('newCategoryForm');
+            const newCategoryNameInput = document.getElementById('newCategoryName');
+            const cancelNewCategoryBtn = document.getElementById('cancelNewCategoryBtn');
+            const taskCategorySelect = document.getElementById('taskCategorySelect');
+            const taskContentInput = document.getElementById('taskContent');
+            const taskAssignerInput = document.getElementById('taskAssigner');
+            const taskCoordinatorInput = document.getElementById('taskCoordinator');
+            const isUrgentCheckbox = document.getElementById('isUrgentCheckbox');
+            const modalTitle = document.getElementById('modalTitle');
+            const editTaskIndicesInput = document.getElementById('editTaskIndices');
+            const sidebar = document.getElementById('sidebar');
+            const sidebarOverlay = document.getElementById('sidebarOverlay');
+            const openSidebarBtn = document.getElementById('openSidebarBtn');
+            const closeSidebarBtn = document.getElementById('closeSidebarBtn');
+            const sidebarMenu = document.getElementById('sidebarMenu');
+            const taskDetailModal = document.getElementById('taskDetailModal');
+            const closeDetailModalBtn = document.getElementById('closeDetailModalBtn');
+            const deleteTaskFromDetailBtn = document.getElementById('deleteTaskFromDetailBtn');
+            const detailModalTitle = document.getElementById('detailModalTitle');
+            const detailModalMeta = document.getElementById('detailModalMeta');
+            const detailTaskIndicesInput = document.getElementById('detailTaskIndices');
+            const viewToggle = document.getElementById('viewToggle');
+            const dashboardView = document.getElementById('dashboardView');
+            const kanbanView = document.getElementById('kanbanView');
+            const agendaView = document.getElementById('agendaView');
+            const addChecklistItemForm = document.getElementById('addChecklistItemForm');
+            const completeChecklistItemForm = document.getElementById('completeChecklistItemForm');
+            const cancelCompleteChecklistItemBtn = document.getElementById('cancelCompleteChecklistItemBtn');
+            const updateItemForm = document.getElementById('updateItemForm');
+            const cancelUpdateItemBtn = document.getElementById('cancelUpdateItemBtn');
+            const editCompletionForm = document.getElementById('editCompletionForm');
+            const cancelEditCompletionBtn = document.getElementById('cancelEditCompletionBtn');
+            const editChecklistItemForm = document.getElementById('editChecklistItemForm');
+            const cancelEditChecklistItemBtn = document.getElementById('cancelEditChecklistItemBtn');
+            const printSummaryBtn = document.getElementById('printSummaryBtn');
+            const cancelSummaryBtn = document.getElementById('cancelSummaryBtn');
+            const printBtn = document.getElementById('printBtn');
+            const copySummaryBtn = document.getElementById('copySummaryBtn');
+            const notificationModal = document.getElementById('notificationModal');
+            const closeNotificationBtn = document.getElementById('closeNotificationBtn');
+            const goToAgendaBtn = document.getElementById('goToAgendaBtn');
+            const filteredKanbanView = document.getElementById('filteredKanbanView');
+            const backToDashboardBtn = document.getElementById('backToDashboardBtn');
+            const backupDataBtn = document.getElementById('backupDataBtn');
+            const restoreDataBtn = document.getElementById('restoreDataBtn');
+            const restoreFileInput = document.getElementById('restoreFileInput');
+            const summaryAttachments = document.getElementById('summaryAttachments');
+            const summaryAttachmentList = document.getElementById('summaryAttachmentList');
+
+
+            let data = JSON.parse(localStorage.getItem('kanbanData-v21')) || initialData;
+            let draggedItem = null;
+            let taskChart = null;
+            let summaryTextForExport = '';
+
+            taskDetailModal.addEventListener('click', (e) => {
+                const downloadBtn = e.target.closest('.download-attachment-btn');
+                if (downloadBtn) {
+                    e.preventDefault();
+                    const url = downloadBtn.dataset.url;
+                    const name = downloadBtn.dataset.name;
+                    
+                    if (!url || !name) {
+                        console.error("Attachment URL or name is missing.");
+                        return;
+                    }
+
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = name;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                }
+            });
+            
+            // --- Core Functions ---
+            function saveData() { localStorage.setItem('kanbanData-v21', JSON.stringify(data)); }
+            function renderAll() { renderBoard(); renderDashboard(); renderSidebarMenu(); if (!agendaView.classList.contains('hidden')) { renderAgendaView(); } }
+
+            function renderDashboard() {
+                const labels = data.categories.map(cat => cat.title);
+                const taskCounts = data.categories.map(cat => (cat.tasks || []).length);
+                const allTasks = data.categories.flatMap(c => c.tasks || []);
+                const allChecklistItems = data.categories.flatMap(c => c.tasks || []).flatMap(t => t.checklist || []).filter(i => !i.completed);
+
+
+                document.getElementById('pendingTasks').textContent = allTasks.filter(t => t.status === 'pending').length;
+                document.getElementById('inProgressTasks').textContent = allTasks.filter(t => t.status === 'in-progress').length;
+                document.getElementById('urgentTasks').textContent = allChecklistItems.filter(t => t.isUrgent).length;
+                document.getElementById('completedTasks').textContent = allTasks.filter(t => t.status === 'completed').length;
+
+                const ctx = document.getElementById('taskChart').getContext('2d');
+                if (taskChart) { taskChart.destroy(); }
+                taskChart = new Chart(ctx, {
+                    type: 'pie',
+                    data: { labels: labels, datasets: [{ label: 'จำนวนงาน', data: taskCounts, backgroundColor: COLORS.slice(0, labels.length), borderColor: '#ffffff', borderWidth: 2 }] },
+                    options: { 
+                        responsive: true, 
+                        plugins: { legend: { position: 'top' }, tooltip: { callbacks: { label: function(context) { let label = context.label || ''; if (label) { label += ': '; } if (context.parsed !== null) { label += context.parsed + ' งาน'; } return label; } } } },
+                        onClick: (event, elements) => {
+                            if (elements.length > 0) {
+                                const chartElement = elements[0];
+                                const index = chartElement.index;
+                                const categoryId = `cat-${index}`;
+                                
+                                viewToggle.querySelector('[data-view="kanban"]').click();
+
+                                setTimeout(() => {
+                                    const targetElement = document.getElementById(categoryId);
+                                    if (targetElement) {
+                                        targetElement.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
+                                    }
+                                }, 100);
+                            }
+                        }
+                    }
+                });
+            }
+
+            function renderBoard() {
+                kanbanBoard.innerHTML = '';
+                if (!data.categories) return;
+                data.categories.forEach((category, catIndex) => {
+                    const color = COLORS[catIndex % COLORS.length];
+                    const columnEl = document.createElement('div');
+                    columnEl.className = 'kanban-column';
+                    columnEl.dataset.catIndex = catIndex;
+                    columnEl.id = `cat-${catIndex}`;
+                    columnEl.style.borderTopColor = color;
+
+                    const activeTasks = (category.tasks || []).filter(t => t.status !== 'completed');
+                    const completedTasks = (category.tasks || []).filter(t => t.status === 'completed');
+
+                    columnEl.innerHTML = `
+                        <div class="column-header" style="color: ${color};">
+                            <span class="font-bold text-lg">${category.title}</span>
+                            <span class="task-count">${activeTasks.length}</span>
+                        </div>
+                        <div class="task-list"></div>
+                        <div class="completed-section-header mt-2 p-2 border-t cursor-pointer text-sm font-semibold text-gray-500 hover:text-gray-800">
+                           <i class="fa-solid fa-chevron-down mr-2 transition-transform duration-200"></i> งานที่เสร็จแล้ว (${completedTasks.length})
+                        </div>
+                        <div class="completed-task-list task-list hidden"></div>
+                    `;
+                    
+                    const taskList = columnEl.querySelector('.task-list');
+                    activeTasks.forEach((task, taskIndex) => {
+                        const originalIndex = (category.tasks || []).findIndex(t => t === task);
+                        const taskCard = createTaskCard(task, catIndex, originalIndex, color);
+                        taskList.appendChild(taskCard);
+                    });
+
+                    const completedTaskList = columnEl.querySelector('.completed-task-list');
+                     completedTasks.forEach((task, taskIndex) => {
+                        const originalIndex = (category.tasks || []).findIndex(t => t === task);
+                        const taskCard = createTaskCard(task, catIndex, originalIndex, color);
+                        completedTaskList.appendChild(taskCard);
+                    });
+
+                    const completedHeader = columnEl.querySelector('.completed-section-header');
+                    completedHeader.addEventListener('click', () => {
+                        completedTaskList.classList.toggle('hidden');
+                        completedHeader.querySelector('i').classList.toggle('rotate-180');
+                    });
+
+
+                    kanbanBoard.appendChild(columnEl);
+                });
+                addDragAndDropListeners();
+            }
+
+            function createTaskCard(task, catIndex, taskIndex, color) {
+                const taskCard = document.createElement('div');
+                taskCard.className = 'task-card';
+                taskCard.classList.add(`status-${task.status}`);
+                taskCard.style.borderLeftColor = color;
+                if (task.isNew && task.status !== 'completed') {
+                    const newBadge = document.createElement('span');
+                    newBadge.className = 'new-badge'; newBadge.textContent = 'ใหม่';
+                    taskCard.appendChild(newBadge);
+                }
+                taskCard.addEventListener('click', (e) => { if (!e.target.closest('.task-action-btn')) { openDetailModal(catIndex, taskIndex); } });
+                const contentEl = document.createElement('div');
+                contentEl.className = 'task-card-content'; contentEl.draggable = true;
+                contentEl.dataset.catIndex = catIndex; contentEl.dataset.taskIndex = taskIndex;
+                contentEl.innerHTML = formatTaskContent(task.content);
+
+                const checklist = task.checklist || [];
+                if(checklist.length > 0) {
+                    const checklistProgressEl = document.createElement('div');
+                    checklistProgressEl.className = 'mt-3';
+                    const completed = checklist.filter(i => i.completed).length;
+                    const total = checklist.length;
+                    const percentage = total > 0 ? (completed / total) * 100 : 0;
+                     checklistProgressEl.innerHTML = `
+                        <div class="flex justify-between items-center mb-1 text-xs text-gray-500">
+                            <span class="flex items-center gap-1"><i class="fa-solid fa-list-check"></i> เช็คลิสต์</span>
+                            <span>${completed}/${total}</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-1.5">
+                            <div class="bg-blue-500 h-1.5 rounded-full" style="width: ${percentage}%"></div>
+                        </div>
+                    `;
+                    contentEl.appendChild(checklistProgressEl);
+                }
+
+                const metaEl = document.createElement('div');
+                metaEl.className = 'task-meta';
+                metaEl.innerHTML = `<div class="meta-item"><i class="fa-solid fa-user-pen"></i> <span>${task.assigner || 'N/A'}</span></div><div class="meta-item"><i class="fa-solid fa-user-group"></i> <span>${task.coordinator || 'N/A'}</span></div>`;
+                const footerEl = document.createElement('div');
+                footerEl.className = 'task-footer';
+                let statusBadge = '';
+                if (task.status === 'pending') statusBadge = `<span class="text-xs font-semibold px-2 py-1 bg-gray-200 text-gray-800 rounded-full">รอดำเนินการ</span>`;
+                if (task.status === 'in-progress') statusBadge = `<span class="text-xs font-semibold px-2 py-1 bg-blue-200 text-blue-800 rounded-full">กำลังดำเนินการ</span>`;
+                if (task.status === 'completed') statusBadge = `<span class="text-xs font-semibold px-2 py-1 bg-green-200 text-green-800 rounded-full">เสร็จสิ้น</span>`;
+                
+                const urgentIcon = task.isUrgent ? `<i class="fa-solid fa-fire text-red-500" title="งานด่วน"></i>` : '';
+                const issueCount = (task.history || []).filter(h => h.type === 'issue').length;
+                const attachmentCount = (task.history || []).reduce((acc, h) => acc + (h.attachments ? h.attachments.length : 0), 0);
+                footerEl.innerHTML = `
+                    <div class="flex items-center gap-2"> ${statusBadge} ${urgentIcon} </div>
+                    <div class="flex items-center gap-3 ml-auto">
+                        ${issueCount > 0 ? `<span class="text-red-500 font-bold"><i class="fa-solid fa-triangle-exclamation"></i> ${issueCount}</span>` : ''}
+                        ${attachmentCount > 0 ? `<span><i class="fa-solid fa-paperclip"></i> ${attachmentCount}</span>` : ''}
+                        <span><i class="fa-regular fa-comment-dots"></i> ${(task.history || []).length}</span>
+                    </div>`;
+                const actionsEl = document.createElement('div');
+                actionsEl.className = 'task-actions';
+
+                let actionButtonsHTML = '';
+                 if (task.status === 'completed') {
+                    actionButtonsHTML += `<button class="task-action-btn reopen" title="เปิดงานอีกครั้ง"><i class="fa-solid fa-arrow-rotate-left"></i></button>`;
+                }
+                actionButtonsHTML += `<button class="task-action-btn edit" title="แก้ไข"><i class="fa-solid fa-pencil"></i></button>`;
+                actionButtonsHTML += `<button class="task-action-btn delete" title="ลบ"><i class="fa-solid fa-trash-can"></i></button>`;
+                actionsEl.innerHTML = actionButtonsHTML;
+                                 
+                const reopenBtn = actionsEl.querySelector('.reopen');
+                if (reopenBtn) {
+                     reopenBtn.addEventListener('click', (e) => { e.stopPropagation(); reopenTask(catIndex, taskIndex); });
+                }
+
+                actionsEl.querySelector('.edit').addEventListener('click', (e) => { e.stopPropagation(); openModalForEdit(catIndex, taskIndex); });
+                actionsEl.querySelector('.delete').addEventListener('click', (e) => { e.stopPropagation(); deleteTask(catIndex, taskIndex); });
+
+                taskCard.appendChild(actionsEl); taskCard.appendChild(contentEl); taskCard.appendChild(metaEl); taskCard.appendChild(footerEl);
+                return taskCard;
+            }
+            
+            function reopenTask(catIndex, taskIndex) {
+                const task = data.categories[catIndex].tasks[taskIndex];
+                task.status = 'in-progress';
+                delete task.completedAt;
+                saveData();
+                renderAll();
+            }
+            
+            function deleteTask(catIndex, taskIndex) {
+                const taskToDelete = data.categories[catIndex].tasks.splice(taskIndex, 1)[0];
+                taskToDelete.originalCategoryIndex = catIndex;
+                if (!data.trash) data.trash = [];
+                data.trash.push(taskToDelete);
+                saveData();
+                renderAll();
+            }
+            
+            function populateCategorySelect() {
+                taskCategorySelect.innerHTML = '';
+                if (!data.categories) return;
+                data.categories.forEach((category, catIndex) => {
+                    const option = document.createElement('option');
+                    option.value = catIndex;
+                    option.textContent = category.title;
+                    taskCategorySelect.appendChild(option);
+                });
+            }
+
+            function openModalForEdit(catIndex, taskIndex) {
+                taskForm.reset();
+                modalTitle.textContent = 'แก้ไขงาน';
+                populateCategorySelect();
+                const task = data.categories[catIndex].tasks[taskIndex];
+                taskContentInput.value = task.content;
+                taskAssignerInput.value = task.assigner || '';
+                taskCoordinatorInput.value = task.coordinator || '';
+                taskCategorySelect.value = catIndex;
+                isUrgentCheckbox.checked = task.isUrgent;
+                editTaskIndicesInput.value = `${catIndex},${taskIndex}`;
+                taskForm.querySelector(`input[name="status"][value="${task.status}"]`).checked = true;
+                taskModal.classList.remove('hidden');
+            }
+            
+            function openModalForAdd() {
+                taskForm.reset();
+                modalTitle.textContent = 'เพิ่มงานใหม่';
+                editTaskIndicesInput.value = '';
+                populateCategorySelect();
+                taskModal.classList.remove('hidden');
+            }
+
+            function openDetailModal(catIndex, taskIndex) {
+                const task = data.categories[catIndex].tasks[taskIndex];
+                if (task.isNew) { task.isNew = false; saveData(); }
+                detailModalTitle.innerHTML = formatTaskContent(task.content);
+                detailModalMeta.innerHTML = `<div class="task-meta !grid-cols-2 text-sm"><div class="meta-item"><i class="fa-solid fa-user-pen"></i> <div><strong>ผู้มอบหมาย:</strong> ${task.assigner || 'N/A'}</div></div><div class="meta-item"><i class="fa-solid fa-user-group"></i> <div><strong>ผู้ประสานงาน:</strong> ${task.coordinator || 'N/A'}</div></div></div>`;
+                detailTaskIndicesInput.value = `${catIndex},${taskIndex}`;
+                renderChecklist(task, catIndex, taskIndex);
+                addChecklistItemForm.reset();
+                taskDetailModal.classList.remove('hidden');
+            }
+            
+            taskForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const content = taskContentInput.value.trim();
+                const assigner = taskAssignerInput.value.trim();
+                const coordinator = taskCoordinatorInput.value.trim();
+                const catIndex = taskCategorySelect.value;
+                const status = taskForm.querySelector('input[name="status"]:checked').value;
+                const isUrgent = isUrgentCheckbox.checked;
+                const editIndices = editTaskIndicesInput.value;
+                if (!content) return;
+                if (editIndices) {
+                    const [origCatIndex, taskIndex] = editIndices.split(',').map(Number);
+                    const task = data.categories[origCatIndex].tasks[taskIndex];
+                    task.content = content; task.assigner = assigner; task.coordinator = coordinator; task.status = status; task.isUrgent = isUrgent;
+                    if (origCatIndex != catIndex) {
+                        const movedTask = data.categories[origCatIndex].tasks.splice(taskIndex, 1)[0];
+                        data.categories[catIndex].tasks.push(movedTask);
+                    }
+                } else {
+                    const newTask = { content, assigner, coordinator, status, isUrgent, history: [], isNew: true, checklist: [], createdAt: new Date().toISOString() };
+                    if (status === 'in-progress' || status === 'completed') {
+                        newTask.startedAt = new Date().toISOString();
+                    }
+                    if (status === 'completed') {
+                        newTask.completedAt = new Date().toISOString();
+                    }
+                    data.categories[catIndex].tasks.push(newTask);
+                }
+                saveData(); renderAll(); closeModal();
+            });
+            
+            function closeModal() {
+                taskModal.classList.add('hidden');
+                taskDetailModal.classList.add('hidden');
+                trashModal.classList.add('hidden');
+                newCategoryModal.classList.add('hidden');
+                completeChecklistItemModal.classList.add('hidden');
+                updateItemModal.classList.add('hidden');
+                editCompletionModal.classList.add('hidden');
+                editChecklistItemModal.classList.add('hidden');
+                summaryModal.classList.add('hidden');
+                notificationModal.classList.add('hidden');
+                renderAll();
+            }
+
+            function renderSidebarMenu() {
+                sidebarMenu.innerHTML = `<div class="sidebar-menu-header">ประเภทโปรเจกต์</div>`;
+                data.categories.forEach((cat, index) => {
+                     sidebarMenu.innerHTML += `<a href="#" class="sidebar-link" data-target-id="cat-${index}"><i class="fa-solid fa-folder w-6"></i> ${cat.title}</a>`;
+                });
+                addSidebarLinkListeners();
+            }
+
+            viewToggle.addEventListener('click', (e) => {
+                const button = e.target.closest('button');
+                if (button) {
+                    const view = button.dataset.view;
+                    switchView(view);
+                }
+            });
+            
+            function switchView(view) {
+                document.getElementById('dashboardView').classList.add('hidden');
+                document.getElementById('agendaView').classList.add('hidden');
+                document.getElementById('kanbanView').classList.add('hidden');
+                document.getElementById('filteredKanbanView').classList.add('hidden');
+                
+                const targetView = document.getElementById(`${view}View`);
+                if(targetView) {
+                    targetView.classList.remove('hidden');
+                }
+
+                viewToggle.querySelectorAll('button').forEach(btn => btn.classList.remove('active'));
+                const newActiveButton = viewToggle.querySelector(`[data-view="${view}"]`);
+                if(newActiveButton) {
+                    newActiveButton.classList.add('active');
+                } else {
+                    const dashboardButton = viewToggle.querySelector(`[data-view="dashboard"]`);
+                    if(dashboardButton) dashboardButton.classList.add('active');
+                }
+
+                 if(view === 'agenda') {
+                     renderAgendaView();
+                 } else if (view === 'dashboard') {
+                      renderDashboard();
+                 }
+            }
+            
+            addCategoryBtn.addEventListener('click', () => {
+                newCategoryModal.classList.remove('hidden');
+                newCategoryNameInput.focus();
+            });
+            
+            addNewCategoryFromModalBtn.addEventListener('click', () => {
+                newCategoryModal.classList.remove('hidden');
+                newCategoryNameInput.focus();
+            });
+            
+            newCategoryForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const categoryName = newCategoryNameInput.value.trim();
+                if (categoryName) {
+                    data.categories.push({ title: categoryName, tasks: [] });
+                    saveData();
+                    if(!taskModal.classList.contains('hidden')) {
+                        populateCategorySelect();
+                        taskCategorySelect.value = data.categories.length - 1;
+                    }
+                    newCategoryModal.classList.add('hidden');
+                    newCategoryForm.reset();
+                    renderAll();
+                }
+            });
+
+            cancelNewCategoryBtn.addEventListener('click', () => {
+                newCategoryModal.classList.add('hidden');
+                newCategoryForm.reset();
+            });
+            
+            function renderTrashList() {
+                trashList.innerHTML = '';
+                if (!data.trash || data.trash.length === 0) {
+                    trashList.innerHTML = `<p class="text-center text-gray-500 py-8">ถังขยะว่างเปล่า</p>`;
+                    return;
+                }
+                data.trash.forEach((task, index) => {
+                    const item = document.createElement('div');
+                    item.className = 'flex items-center justify-between p-3 border-b hover:bg-gray-50';
+                    item.innerHTML = `
+                        <div class="flex-grow pr-4">
+                            <p class="font-medium">${task.content}</p>
+                            <p class="text-sm text-gray-500">ประเภทเดิม: ${data.categories[task.originalCategoryIndex]?.title || 'ไม่ระบุ'}</p>
+                        </div>
+                        <div class="flex-shrink-0 flex gap-2">
+                            <button data-index="${index}" class="restore-btn text-blue-500 hover:text-blue-700 font-semibold flex items-center gap-2 py-1 px-2 rounded-md hover:bg-blue-100 transition-colors"><i class="fa-solid fa-trash-arrow-up"></i> กู้คืน</button>
+                            <button data-index="${index}" class="perm-delete-btn text-red-500 hover:text-red-700 font-semibold flex items-center gap-2 py-1 px-2 rounded-md hover:bg-red-100 transition-colors"><i class="fa-solid fa-eraser"></i> ลบถาวร</button>
+                        </div>
+                    `;
+                    trashList.appendChild(item);
+                });
+            }
+
+            trashList.addEventListener('click', (e) => {
+                const restoreBtn = e.target.closest('.restore-btn');
+                const deleteBtn = e.target.closest('.perm-delete-btn');
+                if (restoreBtn) {
+                    const index = parseInt(restoreBtn.dataset.index);
+                    const taskToRestore = data.trash.splice(index, 1)[0];
+                    const originalCategoryIndex = taskToRestore.originalCategoryIndex;
+                    delete taskToRestore.originalCategoryIndex; 
+                    if (data.categories[originalCategoryIndex]) {
+                        data.categories[originalCategoryIndex].tasks.push(taskToRestore);
+                    } else {
+                        data.categories[0].tasks.push(taskToRestore); 
+                    }
+                    saveData();
+                    renderTrashList();
+                    renderAll();
+                }
+                if (deleteBtn) {
+                    const index = parseInt(deleteBtn.dataset.index);
+                    data.trash.splice(index, 1);
+                    saveData();
+                    renderTrashList();
+                }
+            });
+
+            openTrashBtn.addEventListener('click', () => {
+                renderTrashList();
+                trashModal.classList.remove('hidden');
+            });
+            closeTrashBtn.addEventListener('click', closeModal);
+            
+            function createAttachmentsHTML(attachments) {
+                if (!attachments || attachments.length === 0) return '';
+                
+                let html = '<ul class="attachment-list !pt-2 !mt-2 grid grid-cols-2 sm:grid-cols-3 gap-2">';
+                attachments.forEach(file => {
+                    if (file.type && file.type.startsWith('image/')) {
+                        html += `
+                            <li class="attachment-item">
+                                <a href="#" class="download-attachment-btn block group relative" data-url="${file.url}" data-name="${file.name}">
+                                    <img src="${file.url}" alt="${file.name}" class="rounded-md w-full h-auto object-cover aspect-square">
+                                    <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all flex flex-col items-center justify-center text-white opacity-0 group-hover:opacity-100 rounded-md p-2 text-center">
+                                         <i class="fa-solid fa-download text-lg"></i>
+                                         <span class="text-xs mt-1 break-all">${file.name}</span>
+                                    </div>
+                                </a>
+                            </li>`;
+                    } else {
+                        html += `
+                            <li class="attachment-item col-span-2 sm:col-span-3 bg-gray-100 p-2 rounded-md">
+                                <a href="#" class="download-attachment-btn flex items-center gap-2" data-url="${file.url}" data-name="${file.name}" title="${file.name}">
+                                    <i class="fa-solid fa-file"></i> <span>${file.name}</span>
+                                </a>
+                            </li>`;
+                    }
+                });
+                html += '</ul>';
+                return html;
+            }
+
+            function renderChecklist(task, catIndex, taskIndex) {
+                const checklistView = document.getElementById('checklistView');
+                const checklistProgress = document.getElementById('checklistProgress');
+                checklistView.innerHTML = '';
+                const checklistData = task.checklist || [];
+
+                if (checklistData.length === 0) {
+                    checklistProgress.innerHTML = '';
+                    return;
+                }
+
+                const completed = checklistData.filter(i => i.completed).length;
+                const total = checklistData.length;
+                const percentage = total > 0 ? (completed / total) * 100 : 0;
+
+                checklistProgress.innerHTML = `
+                    <div class="flex justify-between items-center mb-1 text-sm">
+                        <span class="font-semibold">${Math.round(percentage)}%</span>
+                        <span>${completed}/${total}</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div class="bg-blue-500 h-2 rounded-full transition-all duration-300" style="width: ${percentage}%"></div>
+                    </div>`;
+
+                checklistData.forEach((item, index) => {
+                    const li = document.createElement('li');
+                    li.className = 'bg-gray-50 p-2 rounded-md';
+                    const today = new Date();
+                    today.setHours(0,0,0,0);
+                    const isOverdue = item.dueDate && !item.completed && new Date(item.dueDate) < today;
+                    const issueCount = (item.updates || []).filter(u => u.type === 'issue').length;
+
+                    li.innerHTML = `
+                        <div class="flex items-start gap-3">
+                            <input type="checkbox" ${item.completed ? 'checked' : ''} class="form-checkbox h-5 w-5 rounded text-blue-500 focus:ring-blue-500 shrink-0 mt-1">
+                            <div class="flex-grow">
+                                <span class="cursor-pointer ${item.isUrgent ? 'text-red-700 font-semibold' : ''}">
+                                    ${item.text}
+                                    ${item.description ? '<i class="fa-solid fa-circle-info text-gray-400 ml-1" title="มีรายละเอียด"></i>' : ''}
+                                    ${item.completionDetails ? '<i class="fa-solid fa-receipt text-green-600 ml-1" title="มีรายละเอียดการปิดงาน"></i>' : ''}
+                                    ${issueCount > 0 ? `<i class="fa-solid fa-triangle-exclamation text-red-500 ml-1" title="${issueCount} ปัญหา"></i>` : ''}
+                                </span>
+                            </div>
+                             <div class="flex-shrink-0 flex items-center gap-2">
+                                 <span class="text-xs ${isOverdue ? 'font-bold text-red-500' : 'text-gray-500'}">${item.dueDate || ''}</span>
+                                 <button class="edit-duedate-btn text-gray-400 hover:text-blue-500 w-6 h-6 flex items-center justify-center" title="แก้ไข Duedate"><i class="fa-solid fa-calendar-days"></i></button>
+                             </div>
+                            <div class="flex-shrink-0 flex items-center">
+                                <button class="edit-item-btn text-gray-400 hover:text-blue-500 w-6 h-6 flex items-center justify-center" title="แก้ไขรายการ"><i class="fa-solid fa-pencil"></i></button>
+                                <button class="toggle-urgent-btn text-gray-400 hover:text-red-500 w-6 h-6 flex items-center justify-center ${item.isUrgent ? 'text-red-500' : ''}" title="ตั้งเป็นงานด่วน"><i class="fa-solid fa-fire"></i></button>
+                                ${!item.completed ? `<button class="add-update-btn text-gray-400 hover:text-blue-500 w-6 h-6 flex items-center justify-center" title="อัพเดตงาน"><i class="fa-solid fa-comment-dots"></i></button>` : ''}
+                                <button class="delete-item-btn text-gray-400 hover:text-red-500 w-6 h-6 flex items-center justify-center" title="ลบรายการ">&times;</button>
+                            </div>
+                        </div>
+                        <div class="details-section ml-8 border-l-gray-300 description-details">${item.description || ''}</div>
+                        <div class="details-section ml-8 border-l-green-500 completion-details"></div>
+                        <div class="details-section ml-8 border-l-gray-400 updates-container"></div>
+                    `;
+                    
+                    const descriptionEl = li.querySelector('.description-details');
+                    const completionDetailsEl = li.querySelector('.completion-details');
+                    const updatesContainerEl = li.querySelector('.updates-container');
+
+                    if (!item.description) { descriptionEl.style.display = 'none'; }
+                    
+                    if (!item.completionDetails) { 
+                        completionDetailsEl.style.display = 'none'; 
+                    } else {
+                        const attachmentsHTML = createAttachmentsHTML(item.completionDetails.attachments);
+                        
+                        let editHistoryHTML = '';
+                        if(item.completionDetails.editHistory && item.completionDetails.editHistory.length > 0) {
+                            editHistoryHTML = '<div class="mt-3 pt-3 border-t border-gray-200"><p class="font-semibold text-xs mb-1">ประวัติการแก้ไข:</p><ul class="space-y-1 text-xs">';
+                            item.completionDetails.editHistory.forEach(edit => {
+                                editHistoryHTML += `<li class="text-gray-500">${edit.timestamp}: ${edit.reason} (เปลี่ยน Duedate จาก ${edit.oldDueDate} เป็น ${edit.newDueDate})</li>`;
+                            });
+                            editHistoryHTML += '</ul></div>';
+                        }
+
+                        completionDetailsEl.innerHTML = `
+                            <p class="font-semibold">ผลการดำเนินงาน:</p>
+                            <p>${item.completionDetails.text || 'ไม่มีรายละเอียด'}</p>
+                            ${attachmentsHTML}
+                            <p class="text-xs text-gray-400 mt-2">ปิดงานเมื่อ: ${item.completionDetails.timestamp}</p>
+                            ${editHistoryHTML}
+                        `;
+                    }
+
+                    if (!item.updates || item.updates.length === 0) { updatesContainerEl.style.display = 'none'; } else {
+                         updatesContainerEl.innerHTML = `<p class="font-semibold mb-2">ประวัติการอัพเดต:</p>`;
+                         item.updates.forEach(update => {
+                             const attachmentsHTML = createAttachmentsHTML(update.attachments);
+                             const isIssue = update.type === 'issue';
+                             const updateItemEl = document.createElement('div');
+                             updateItemEl.className = 'pb-2 mb-2 border-b border-gray-200 last:border-b-0 last:pb-0 last:mb-0 relative pl-5';
+                             updateItemEl.innerHTML = `
+                                <i class="fa-solid ${isIssue ? 'fa-triangle-exclamation text-red-500' : 'fa-info-circle text-blue-500'} absolute left-0 top-1"></i>
+                                <p>${update.text}</p>
+                                ${attachmentsHTML}
+                                <p class="text-xs text-gray-400 mt-2">${isIssue ? 'แจ้งปัญหาเมื่อ' : 'อัพเดตเมื่อ'}: ${update.timestamp}</p>
+                             `;
+                             updatesContainerEl.appendChild(updateItemEl);
+                         });
+                    }
+
+                    li.querySelector('div.flex-grow > span').addEventListener('click', () => {
+                        const isDescVisible = descriptionEl.style.display === 'block';
+                        const isCompVisible = completionDetailsEl.style.display === 'block';
+                        const isUpdateVisible = updatesContainerEl.style.display === 'block';
+                        descriptionEl.style.display = isDescVisible ? 'none' : (item.description ? 'block' : 'none');
+                        completionDetailsEl.style.display = isCompVisible ? 'none' : (item.completionDetails ? 'block' : 'none');
+                        updatesContainerEl.style.display = isUpdateVisible ? 'none' : (item.updates && item.updates.length > 0 ? 'block' : 'none');
+                    });
+
+                    li.querySelector('input[type="checkbox"]').addEventListener('change', (e) => {
+                        e.preventDefault();
+                        if (e.target.checked) {
+                            openCompleteChecklistItemModal(catIndex, taskIndex, index);
+                        } else {
+                            item.completed = false;
+                            delete item.completionDetails;
+                            if (task.status === 'completed') {
+                                task.status = 'in-progress';
+                            }
+                            saveData();
+                            renderChecklist(task, catIndex, taskIndex);
+                            renderAll();
+                        }
+                    });
+
+                    li.querySelector('.edit-item-btn').addEventListener('click', () => {
+                        openEditChecklistItemModal(catIndex, taskIndex, index);
+                    });
+                    
+                    li.querySelector('.toggle-urgent-btn').addEventListener('click', () => {
+                        item.isUrgent = !item.isUrgent;
+                        saveData();
+                        renderChecklist(task, catIndex, taskIndex); // Re-render list for immediate feedback
+                        renderDashboard(); // Update dashboard stats in background
+                    });
+
+                    const addUpdateBtn = li.querySelector('.add-update-btn');
+                    if(addUpdateBtn) {
+                        addUpdateBtn.addEventListener('click', () => {
+                            openUpdateItemModal(catIndex, taskIndex, index);
+                        });
+                    }
+
+                    li.querySelector('.edit-duedate-btn').addEventListener('click', () => {
+                         openEditCompletionModal(catIndex, taskIndex, index);
+                    });
+                    
+                    const deleteBtn = li.querySelector('.delete-item-btn');
+                    if (deleteBtn) {
+                        deleteBtn.addEventListener('click', () => {
+                            checklistData.splice(index, 1);
+                            saveData();
+                            renderChecklist(task, catIndex, taskIndex);
+                            renderAll();
+                        });
+                    }
+
+                    checklistView.appendChild(li);
+                });
+            }
+            
+            function openCompleteChecklistItemModal(catIndex, taskIndex, itemIndex) {
+                const item = data.categories[catIndex].tasks[taskIndex].checklist[itemIndex];
+                document.getElementById('completeChecklistItemName').textContent = item.text;
+                document.getElementById('completeChecklistItemIndices').value = `${catIndex},${taskIndex},${itemIndex}`;
+                completeChecklistItemModal.classList.remove('hidden');
+                completeChecklistItemForm.reset();
+            }
+
+            cancelCompleteChecklistItemBtn.addEventListener('click', () => {
+                closeModal();
+            });
+
+            completeChecklistItemForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const text = document.getElementById('completionDetailsText').value.trim();
+                const files = document.getElementById('completionDetailsAttachments').files;
+                const [catIndex, taskIndex, itemIndex] = document.getElementById('completeChecklistItemIndices').value.split(',').map(Number);
+                
+                const task = data.categories[catIndex].tasks[taskIndex];
+                const item = task.checklist[itemIndex];
+
+                if (task.status === 'pending') {
+                    task.status = 'in-progress';
+                    if(!task.startedAt) task.startedAt = new Date().toISOString();
+                }
+                
+                const fileReadPromises = Array.from(files).map(file => { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve({ name: file.name, type: file.type, url: reader.result }); reader.onerror = error => reject(error); reader.readAsDataURL(file); }); });
+                const attachments = await Promise.all(fileReadPromises);
+
+                item.completed = true;
+                item.completionDetails = {
+                    text: text,
+                    attachments: attachments,
+                    timestamp: new Date().toLocaleString('th-TH', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                };
+
+                const allChecklistItemsCompleted = task.checklist.every(ci => ci.completed);
+                if (allChecklistItemsCompleted) {
+                    task.status = 'completed';
+                    if(!task.completedAt) task.completedAt = new Date().toISOString();
+                }
+                
+                saveData();
+                closeModal();
+                if (!taskDetailModal.classList.contains('hidden')) {
+                     renderChecklist(task, catIndex, taskIndex);
+                }
+            });
+            
+            function openEditChecklistItemModal(catIndex, taskIndex, itemIndex) {
+                const item = data.categories[catIndex].tasks[taskIndex].checklist[itemIndex];
+                document.getElementById('editChecklistItemIndices').value = `${catIndex},${taskIndex},${itemIndex}`;
+                document.getElementById('editChecklistItemText').value = item.text;
+                document.getElementById('editChecklistItemDescription').value = item.description || '';
+                editChecklistItemModal.classList.remove('hidden');
+            }
+
+            cancelEditChecklistItemBtn.addEventListener('click', closeModal);
+
+            editChecklistItemForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const [catIndex, taskIndex, itemIndex] = document.getElementById('editChecklistItemIndices').value.split(',').map(Number);
+                const newText = document.getElementById('editChecklistItemText').value.trim();
+                const newDescription = document.getElementById('editChecklistItemDescription').value.trim();
+
+                if (newText) {
+                    const task = data.categories[catIndex].tasks[taskIndex];
+                    const item = task.checklist[itemIndex];
+                    item.text = newText;
+                    item.description = newDescription;
+
+                    saveData();
+                    closeModal();
+                    if (!taskDetailModal.classList.contains('hidden')) {
+                        renderChecklist(task, catIndex, taskIndex);
+                    }
+                }
+            });
+
+            function openUpdateItemModal(catIndex, taskIndex, itemIndex) {
+                const item = data.categories[catIndex].tasks[taskIndex].checklist[itemIndex];
+                document.getElementById('updateItemName').textContent = item.text;
+                document.getElementById('updateItemIndices').value = `${catIndex},${taskIndex},${itemIndex}`;
+                updateItemModal.classList.remove('hidden');
+                updateItemForm.reset();
+            }
+
+            cancelUpdateItemBtn.addEventListener('click', closeModal);
+            
+            updateItemForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const text = document.getElementById('updateItemText').value.trim();
+                const files = document.getElementById('updateItemAttachments').files;
+                const updateType = document.querySelector('input[name="updateType"]:checked').value;
+                const [catIndex, taskIndex, itemIndex] = document.getElementById('updateItemIndices').value.split(',').map(Number);
+                
+                const task = data.categories[catIndex].tasks[taskIndex];
+                const item = task.checklist[itemIndex];
+
+                const fileReadPromises = Array.from(files).map(file => { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve({ name: file.name, type: file.type, url: reader.result }); reader.onerror = error => reject(error); reader.readAsDataURL(file); }); });
+                const attachments = await Promise.all(fileReadPromises);
+
+                if (!item.updates) item.updates = [];
+                item.updates.push({
+                    type: updateType,
+                    text: text,
+                    attachments: attachments,
+                    timestamp: new Date().toLocaleString('th-TH', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                });
+
+                saveData();
+                closeModal();
+                if (!taskDetailModal.classList.contains('hidden')) {
+                     renderChecklist(task, catIndex, taskIndex);
+                }
+            });
+            
+            function openEditCompletionModal(catIndex, taskIndex, itemIndex) {
+                const item = data.categories[catIndex].tasks[taskIndex].checklist[itemIndex];
+                document.getElementById('editCompletionItemName').textContent = item.text;
+                document.getElementById('editCompletionItemIndices').value = `${catIndex},${taskIndex},${itemIndex}`;
+                document.getElementById('editCompletionDueDate').value = item.dueDate || '';
+                document.getElementById('editCompletionDetailsText').value = item.completionDetails?.text || '';
+                const currentAttachments = document.getElementById('currentAttachments');
+                if (item.completionDetails?.attachments && item.completionDetails.attachments.length > 0) {
+                    currentAttachments.textContent = 'ไฟล์ปัจจุบัน: ' + item.completionDetails.attachments.map(f => f.name).join(', ');
+                } else {
+                    currentAttachments.textContent = '';
+                }
+                editCompletionModal.classList.remove('hidden');
+                editCompletionForm.reset();
+            }
+
+            cancelEditCompletionBtn.addEventListener('click', closeModal);
+
+            editCompletionForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const reason = document.getElementById('editReason').value.trim();
+                if(!reason) {
+                    // Replace alert with a more user-friendly notification in a real app
+                    console.error('Reason for edit is required.');
+                    return;
+                }
+
+                const newDueDate = document.getElementById('editCompletionDueDate').value;
+                const newDetailsText = document.getElementById('editCompletionDetailsText').value.trim();
+                const newFiles = document.getElementById('editCompletionAttachments').files;
+
+                const [catIndex, taskIndex, itemIndex] = document.getElementById('editCompletionItemIndices').value.split(',').map(Number);
+                const task = data.categories[catIndex].tasks[taskIndex];
+                const item = task.checklist[itemIndex];
+
+                if (!item.completionDetails) item.completionDetails = {};
+                if (!item.completionDetails.editHistory) {
+                    item.completionDetails.editHistory = [];
+                }
+                
+                item.completionDetails.editHistory.push({
+                    reason: reason,
+                    oldDueDate: item.dueDate,
+                    newDueDate: newDueDate,
+                    timestamp: new Date().toLocaleString('th-TH', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                });
+
+                item.dueDate = newDueDate;
+                item.completionDetails.text = newDetailsText;
+
+                if (newFiles.length > 0) {
+                    const fileReadPromises = Array.from(newFiles).map(file => { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve({ name: file.name, type: file.type, url: reader.result }); reader.onerror = error => reject(error); reader.readAsDataURL(file); }); });
+                    item.completionDetails.attachments = await Promise.all(fileReadPromises);
+                }
+                
+                saveData();
+                closeModal();
+                 if (!taskDetailModal.classList.contains('hidden')) {
+                     renderChecklist(task, catIndex, taskIndex);
+                 }
+            });
+
+
+            addChecklistItemForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const textInput = document.getElementById('newChecklistItemText');
+                const dateInput = document.getElementById('newChecklistItemDueDate');
+                const descriptionInput = document.getElementById('newChecklistItemDescription');
+                const text = textInput.value.trim();
+                const dueDate = dateInput.value;
+                const description = descriptionInput.value.trim();
+
+                if (text) {
+                    const [catIndex, taskIndex] = detailTaskIndicesInput.value.split(',').map(Number);
+                    const task = data.categories[catIndex].tasks[taskIndex];
+                    if (!task.checklist) task.checklist = [];
+                    task.checklist.push({ text, completed: false, dueDate, description, updates: [], isUrgent: false });
+                    saveData();
+                    renderChecklist(task, catIndex, taskIndex);
+                    renderAll();
+                    addChecklistItemForm.reset();
+                }
+            });
+
+            function renderAgendaView() {
+                const overdueList = document.getElementById('overdueList');
+                const dueTodayList = document.getElementById('dueTodayList');
+                const dueTomorrowList = document.getElementById('dueTomorrowList');
+                const upcomingList = document.getElementById('upcomingList');
+
+                overdueList.innerHTML = '';
+                dueTodayList.innerHTML = '';
+                dueTomorrowList.innerHTML = '';
+                upcomingList.innerHTML = '';
+
+                let allChecklistItems = [];
+                data.categories.forEach((cat, catIndex) => {
+                    (cat.tasks || []).forEach((task, taskIndex) => {
+                        (task.checklist || []).forEach((item, itemIndex) => {
+                            if (!item.completed) {
+                                allChecklistItems.push({ ...item, catIndex, taskIndex, taskContent: task.content });
+                            }
+                        });
+                    });
+                });
+
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+
+                const tomorrow = new Date(today);
+                tomorrow.setDate(tomorrow.getDate() + 1);
+
+                const overdueItems = allChecklistItems.filter(i => i.dueDate && new Date(i.dueDate) < today);
+                const dueTodayItems = allChecklistItems.filter(i => i.dueDate && new Date(i.dueDate).toDateString() === today.toDateString());
+                const dueTomorrowItems = allChecklistItems.filter(i => i.dueDate && new Date(i.dueDate).toDateString() === tomorrow.toDateString());
+                const upcomingItems = allChecklistItems.filter(i => i.dueDate && new Date(i.dueDate) > tomorrow);
+                
+                const sortByUrgencyAndDate = (a, b) => {
+                    if (a.isUrgent && !b.isUrgent) return -1;
+                    if (!a.isUrgent && b.isUrgent) return 1;
+                    if (a.dueDate && b.dueDate) return new Date(a.dueDate) - new Date(b.dueDate);
+                    return 0;
+                };
+
+                const createAgendaItem = (item, listEl) => {
+                    const li = document.createElement('li');
+                    li.className = 'bg-white p-3 rounded-md shadow-sm flex items-center justify-between cursor-pointer hover:bg-gray-50';
+                    let remainingText = '';
+                    if (listEl === upcomingList) {
+                        const diffTime = Math.abs(new Date(item.dueDate) - today);
+                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                        remainingText = `<span class="text-sm font-semibold text-gray-500">เหลือ ${diffDays} วัน</span>`;
+                    }
+                     li.innerHTML = `
+                        <div>
+                            <p class="font-semibold">${item.isUrgent ? '<i class="fa-solid fa-fire text-red-500 mr-1"></i>' : ''}${item.text}</p>
+                            <p class="text-sm text-gray-500">${data.categories[item.catIndex].title} / ${item.taskContent}</p>
+                        </div>
+                        ${remainingText || `<span class="text-sm font-bold ${listEl === overdueList ? 'text-red-500' : 'text-gray-600'}">${item.dueDate}</span>`}
+                    `;
+                    li.addEventListener('click', () => openDetailModal(item.catIndex, item.taskIndex));
+                    listEl.appendChild(li);
+                }
+                
+                if (overdueItems.length === 0) overdueList.innerHTML = '<p class="text-center text-sm text-gray-500">ไม่มีงานที่เกินกำหนด</p>';
+                else overdueItems.sort(sortByUrgencyAndDate).forEach(item => createAgendaItem(item, overdueList));
+
+                if (dueTodayItems.length === 0) dueTodayList.innerHTML = '<p class="text-center text-sm text-gray-500">ไม่มีงานสำหรับวันนี้</p>';
+                else dueTodayItems.sort(sortByUrgencyAndDate).forEach(item => createAgendaItem(item, dueTodayList));
+
+                if (dueTomorrowItems.length === 0) dueTomorrowList.innerHTML = '<p class="text-center text-sm text-gray-500">ไม่มีงานสำหรับวันพรุ่งนี้</p>';
+                else dueTomorrowItems.sort(sortByUrgencyAndDate).forEach(item => createAgendaItem(item, dueTomorrowList));
+
+                if (upcomingItems.length === 0) upcomingList.innerHTML = '<p class="text-center text-sm text-gray-500">ไม่มีงานอื่นๆ</p>';
+                else upcomingItems.sort(sortByUrgencyAndDate).forEach(item => createAgendaItem(item, upcomingList));
+            }
+
+
+            // --- All other helper functions (drag&drop, file handling, etc.) remain unchanged ---
+            function formatTaskContent(content) { return content.replace(/\((\d{1,2}[\.\/]\d{1,2}[\.\/]\d{2,4})\)/g, '(<span class="highlight-date">$1</span>)').replace(/\b(\d{1,3}(,\d{3})*(\.\d+)?)\b/g, '<span class="highlight-money">$1</span>').replace(/(ติดตาม|รีมายด์|ค้าง|รอ)/g, '<span class="highlight-keyword">$1</span>'); }
+            function openSidebar() { sidebar.classList.add('open'); sidebarOverlay.classList.add('open'); }
+            function closeSidebar() { sidebar.classList.remove('open'); sidebarOverlay.classList.remove('open'); }
+            function addSidebarLinkListeners() { document.querySelectorAll('.sidebar-link').forEach(link => { link.addEventListener('click', (e) => { e.preventDefault(); const targetId = e.currentTarget.dataset.targetId; const targetElement = document.getElementById(targetId); document.getElementById('dashboardView').classList.add('hidden'); document.getElementById('agendaView').classList.add('hidden'); document.getElementById('kanbanView').classList.remove('hidden'); viewToggle.querySelector('[data-view="kanban"]').classList.add('active'); viewToggle.querySelector('[data-view="dashboard"]').classList.remove('active'); viewToggle.querySelector('[data-view="agenda"]').classList.remove('active'); if (targetElement) { const container = document.querySelector('.main-content'); const containerRect = container.getBoundingClientRect(); const targetRect = targetElement.getBoundingClientRect(); container.scrollLeft += targetRect.left - containerRect.left - 24; } closeSidebar(); }); }); }
+            function addDragAndDropListeners() { const taskCards = document.querySelectorAll('.task-card-content'); const taskLists = document.querySelectorAll('.task-list'); taskCards.forEach(card => { card.addEventListener('dragstart', (e) => { draggedItem = e.target.closest('.task-card').querySelector('.task-card-content'); setTimeout(() => e.target.closest('.task-card').classList.add('dragging'), 0); }); card.addEventListener('dragend', () => { document.querySelector('.task-card.dragging')?.classList.remove('dragging'); draggedItem = null; }); }); taskLists.forEach(list => { list.addEventListener('dragover', e => { e.preventDefault(); }); list.addEventListener('drop', e => { e.preventDefault(); const targetColumnEl = e.target.closest('.kanban-column'); if (!targetColumnEl || !draggedItem) return; const fromCatIndex = parseInt(draggedItem.dataset.catIndex); const fromTaskIndex = parseInt(draggedItem.dataset.taskIndex); const toCatIndex = parseInt(targetColumnEl.dataset.catIndex); const taskToMove = data.categories[fromCatIndex].tasks[fromTaskIndex]; data.categories[fromCatIndex].tasks.splice(fromTaskIndex, 1); const afterElement = getDragAfterElement(targetColumnEl.querySelector('.task-list:not(.completed-task-list)'), e.clientY); if (afterElement) { const toTaskIndex = parseInt(afterElement.dataset.taskIndex); data.categories[toCatIndex].tasks.splice(toTaskIndex, 0, taskToMove); } else { data.categories[toCatIndex].tasks.push(taskToMove); } saveData(); renderAll(); }); }); }
+            function getDragAfterElement(container, y) { const draggableElements = [...container.querySelectorAll('.task-card:not(.dragging)')]; return draggableElements.reduce((closest, child) => { const box = child.getBoundingClientRect(); const offset = y - box.top - box.height / 2; if (offset < 0 && offset > closest.offset) { return { offset: offset, element: child }; } else { return closest; } }, { offset: Number.NEGATIVE_INFINITY }).element; }
+            
+            printSummaryBtn.addEventListener('click', () => {
+                const [catIndex, taskIndex] = detailTaskIndicesInput.value.split(',').map(Number);
+                const task = data.categories[catIndex].tasks[taskIndex];
+                openSummaryModal(task, catIndex);
+            });
+            cancelSummaryBtn.addEventListener('click', closeModal);
+            printBtn.addEventListener('click', () => {
+                const userText = document.getElementById('summaryEditable').value;
+                const files = document.getElementById('summaryAttachments').files;
+                const printContentEl = document.getElementById('userAddedContentForPrint');
+                
+                let userContentHTML = '';
+                if (userText.trim()) {
+                    userContentHTML += `<div class="mt-6"><h3 class="font-bold text-lg mb-2">รายละเอียดเพิ่มเติม</h3><p>${userText.replace(/\n/g, '<br>')}</p></div>`;
+                }
+                if (files.length > 0) {
+                    userContentHTML += `<div class="mt-4"><h4 class="font-semibold mb-1">ไฟล์แนบ:</h4><ul class="list-disc pl-5">`;
+                    Array.from(files).forEach(file => {
+                        userContentHTML += `<li>${file.name}</li>`;
+                    });
+                    userContentHTML += `</ul></div>`;
+                }
+
+                printContentEl.innerHTML = userContentHTML;
+                
+                window.print();
+            });
+            copySummaryBtn.addEventListener('click', () => {
+                const userText = document.getElementById('summaryEditable').value;
+                const files = document.getElementById('summaryAttachments').files;
+
+                let fullText = summaryTextForExport;
+                if(userText.trim()) {
+                    fullText += '\n\n--- รายละเอียดเพิ่มเติม ---\n' + userText;
+                }
+                if(files.length > 0) {
+                    fullText += '\n\n--- ไฟล์แนบ ---\n';
+                    fullText += Array.from(files).map(f => `- ${f.name}`).join('\n');
+                }
+
+                 navigator.clipboard.writeText(fullText).then(() => {
+                     const originalText = copySummaryBtn.innerHTML;
+                     copySummaryBtn.innerHTML = '<i class="fa-solid fa-check"></i> คัดลอกแล้ว';
+                     copySummaryBtn.classList.add('bg-green-500', 'hover:bg-green-600');
+                     copySummaryBtn.classList.remove('bg-gray-500', 'hover:bg-gray-600');
+                     setTimeout(() => {
+                         copySummaryBtn.innerHTML = originalText;
+                         copySummaryBtn.classList.remove('bg-green-500', 'hover:bg-green-600');
+                         copySummaryBtn.classList.add('bg-gray-500', 'hover:bg-gray-600');
+                     }, 2000);
+                 });
+            });
+
+            const exportSummaryBtn = document.getElementById('exportSummaryBtn');
+            exportSummaryBtn.addEventListener('click', () => {
+                const userText = document.getElementById('summaryEditable').value;
+                const files = document.getElementById('summaryAttachments').files;
+                let fullText = summaryTextForExport;
+                if(userText.trim()) {
+                    fullText += '\n\n--- รายละเอียดเพิ่มเติม ---\n' + userText;
+                }
+                if(files.length > 0) {
+                    fullText += '\n\n--- ไฟล์แนบ ---\n';
+                    fullText += Array.from(files).map(f => `- ${f.name}`).join('\n');
+                }
+                
+                const taskTitle = document.getElementById('summaryModalTitle').textContent.replace('สรุปรายงาน: ', '').trim();
+                const filename = `summary-${taskTitle.replace(/[^a-z0-9ก-๙]/gi, '_').toLowerCase()}.txt`;
+
+                const blob = new Blob([fullText], { type: 'text/plain;charset=utf-8' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = filename;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(link.href);
+            });
+
+            summaryAttachments.addEventListener('change', () => {
+                summaryAttachmentList.innerHTML = '';
+                if (summaryAttachments.files.length > 0) {
+                    const fileList = Array.from(summaryAttachments.files).map(file => 
+                        `<div class="flex items-center gap-2"><i class="fa-solid fa-file text-gray-400"></i><span>${file.name}</span></div>`
+                    ).join('');
+                    summaryAttachmentList.innerHTML = fileList;
+                }
+            });
+
+            function formatDuration(ms) {
+                if (!ms || ms < 0) return 'N/A';
+                let seconds = Math.floor(ms / 1000);
+                let minutes = Math.floor(seconds / 60);
+                let hours = Math.floor(minutes / 60);
+                const days = Math.floor(hours / 24);
+                hours = hours % 24;
+                minutes = minutes % 60;
+                let durationString = '';
+                if (days > 0) durationString += `${days} วัน `;
+                if (hours > 0) durationString += `${hours} ชั่วโมง `;
+                if (minutes > 0) durationString += `${minutes} นาที`;
+                return durationString.trim() || 'น้อยกว่า 1 นาที';
+            }
+
+            function openSummaryModal(task, catIndex) {
+                document.getElementById('summaryModalTitle').textContent = `สรุปรายงาน: ${task.content}`;
+                document.getElementById('summaryTaskCategory').textContent = `ประเภท: ${data.categories[catIndex].title}`;
+                
+                const timeToStart = task.startedAt ? new Date(task.startedAt) - new Date(task.createdAt) : null;
+                const activeDuration = task.completedAt && task.startedAt ? new Date(task.completedAt) - new Date(task.startedAt) : null;
+                
+                document.getElementById('summaryTimeToStart').innerHTML = `<p class="font-semibold text-sm text-gray-500">เวลารอเริ่ม</p><p class="font-bold text-lg">${formatDuration(timeToStart)}</p>`;
+                document.getElementById('summaryActiveDuration').innerHTML = `<p class="font-semibold text-sm text-gray-500">เวลาดำเนินการ</p><p class="font-bold text-lg">${formatDuration(activeDuration)}</p>`;
+                document.getElementById('summaryStatus').innerHTML = `<p class="font-semibold text-sm text-gray-500">สถานะ</p><p class="font-bold text-lg">${task.status}</p>`;
+
+                let summaryContentHTML = '';
+                let summaryText = `สรุปรายงาน: ${task.content}\n`;
+                summaryText += `ประเภท: ${data.categories[catIndex].title}\n`;
+                summaryText += `สถานะ: ${task.status}\n`;
+                summaryText += `เวลาดำเนินการ: ${formatDuration(activeDuration)}\n\n`;
+                
+                const checklist = task.checklist || [];
+                if (checklist.length > 0) {
+                    summaryContentHTML += '<h3 class="font-bold text-lg mb-2 border-b pb-1">รายละเอียดเช็คลิสต์</h3>';
+                    summaryText += '--- รายละเอียดเช็คลิสต์ ---\n';
+                    
+                    checklist.forEach(item => {
+                        const itemStatusIcon = item.completed ? '<i class="fa-solid fa-check-circle text-green-500"></i>' : '<i class="fa-regular fa-circle text-gray-500"></i>';
+                        const itemStatusText = item.completed ? '[เสร็จสิ้น]' : '[รอดำเนินการ]';
+                        
+                        summaryContentHTML += `
+                            <div class="py-2 border-b last:border-b-0">
+                                <p class="font-semibold flex items-center gap-2">${itemStatusIcon} ${item.text}</p>
+                                <div class="pl-6 text-sm text-gray-600 space-y-1 mt-1">
+                        `;
+                        summaryText += `\n${itemStatusText} ${item.text}\n`;
+
+                        if (item.description) {
+                            summaryContentHTML += `<p><strong>รายละเอียด:</strong> ${item.description}</p>`;
+                            summaryText += `  - รายละเอียด: ${item.description}\n`;
+                        }
+                        if (item.dueDate) {
+                            summaryContentHTML += `<p><strong>กำหนดเสร็จ:</strong> ${item.dueDate}</p>`;
+                            summaryText += `  - กำหนดเสร็จ: ${item.dueDate}\n`;
+                        }
+
+                        if (item.completionDetails) {
+                             summaryContentHTML += `<p class="text-green-700"><strong>ผลการดำเนินงาน:</strong> ${item.completionDetails.text || 'N/A'} (เมื่อ ${item.completionDetails.timestamp})</p>`;
+                             summaryText += `  - ผลการดำเนินงาน: ${item.completionDetails.text || 'N/A'} (เมื่อ ${item.completionDetails.timestamp})\n`;
+                        }
+
+                        const updates = item.updates || [];
+                        if (updates.length > 0) {
+                             summaryContentHTML += `<div><strong>ประวัติการอัพเดต:</strong><ul class="list-disc pl-5">`;
+                             summaryText += `  - ประวัติการอัพเดต:\n`;
+                             updates.forEach(update => {
+                                 const updateClass = update.type === 'issue' ? 'text-red-700' : 'text-blue-700';
+                                 summaryContentHTML += `<li class="${updateClass}">(${update.timestamp}) ${update.text}</li>`;
+                                 summaryText += `    * (${update.timestamp}) [${update.type.toUpperCase()}] ${update.text}\n`;
+                             });
+                             summaryContentHTML += '</ul></div>';
+                        }
+                        
+                        const editHistory = item.completionDetails?.editHistory || [];
+                        if (editHistory.length > 0) {
+                             summaryContentHTML += `<div><strong>ประวัติการแก้ไข:</strong><ul class="list-disc pl-5">`;
+                             summaryText += `  - ประวัติการแก้ไข:\n`;
+                             editHistory.forEach(edit => {
+                                 summaryContentHTML += `<li class="text-yellow-700">(${edit.timestamp}) ${edit.reason} (Duedate: ${edit.oldDueDate} -> ${edit.newDueDate})</li>`;
+                                 summaryText += `    * (${edit.timestamp}) ${edit.reason} (Duedate: ${edit.oldDueDate} -> ${edit.newDueDate})\n`;
+                             });
+                             summaryContentHTML += '</ul></div>';
+                        }
+                        
+                        summaryContentHTML += `</div></div>`;
+                    });
+                }
+
+                document.getElementById('summaryContent').innerHTML = summaryContentHTML;
+                summaryTextForExport = summaryText;
+                document.getElementById('summaryEditable').value = '';
+                document.getElementById('summaryAttachments').value = '';
+                document.getElementById('summaryAttachmentList').innerHTML = '';
+                summaryModal.classList.remove('hidden');
+            }
+            
+            function showStartupNotification() {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+
+                let allChecklistItems = [];
+                data.categories.forEach((cat) => {
+                    (cat.tasks || []).forEach((task) => {
+                        (task.checklist || []).forEach((item) => {
+                            if (!item.completed) {
+                                allChecklistItems.push(item);
+                            }
+                        });
+                    });
+                });
+
+                const urgentCount = allChecklistItems.filter(i => i.isUrgent).length;
+                const todayCount = allChecklistItems.filter(i => !i.isUrgent && i.dueDate && new Date(i.dueDate).toDateString() === today.toDateString()).length;
+                
+                if (urgentCount > 0 || todayCount > 0) {
+                    document.getElementById('notificationUrgentCount').textContent = urgentCount;
+                    document.getElementById('notificationTodayCount').textContent = todayCount;
+                    notificationModal.classList.remove('hidden');
+                    setTimeout(() => {
+                        notificationModal.querySelector('div').classList.remove('scale-95', 'opacity-0');
+                    }, 10);
+                }
+            }
+            
+            closeNotificationBtn.addEventListener('click', () => {
+                notificationModal.querySelector('div').classList.add('scale-95', 'opacity-0');
+                setTimeout(() => {
+                    notificationModal.classList.add('hidden');
+                }, 300);
+            });
+            
+            goToAgendaBtn.addEventListener('click', () => {
+                closeModal();
+                viewToggle.querySelector('[data-view="agenda"]').click();
+            });
+
+
+            openSidebarBtn.addEventListener('click', openSidebar); closeSidebarBtn.addEventListener('click', closeSidebar); sidebarOverlay.addEventListener('click', closeSidebar); addTaskBtn.addEventListener('click', openModalForAdd); cancelBtn.addEventListener('click', closeModal); closeDetailModalBtn.addEventListener('click', closeModal);
+            deleteTaskFromDetailBtn.addEventListener('click', () => {
+                const [catIndex, taskIndex] = detailTaskIndicesInput.value.split(',').map(Number);
+                deleteTask(catIndex, taskIndex);
+                closeModal();
+            });
+            
+            document.querySelectorAll('.stat-card').forEach(card => {
+                card.addEventListener('click', () => {
+                    const filter = card.dataset.filter;
+                    let filteredTasks = [];
+                    const allTasks = data.categories.flatMap((cat, catIndex) => 
+                        (cat.tasks || []).map((task, taskIndex) => ({
+                            ...task, 
+                            catIndex, 
+                            taskIndex, 
+                            categoryTitle: cat.title 
+                        }))
+                    );
+
+                    const allChecklistItems = data.categories.flatMap((cat, catIndex) => 
+                        (cat.tasks || []).flatMap((task, taskIndex) => 
+                            (task.checklist || []).map(item => ({
+                                ...item,
+                                parentTask: { ...task, catIndex, taskIndex, categoryTitle: cat.title }
+                            }))
+                        )
+                    );
+                    
+                    const filterMapping = {
+                        'pending': 'งานที่รอดำเนินการ',
+                        'in-progress': 'งานที่กำลังดำเนินการ',
+                        'urgent': 'งานด่วน',
+                        'completed': 'งานที่เสร็จสิ้นแล้ว'
+                    };
+
+                    let title = filterMapping[filter];
+
+                    if (filter === 'urgent') {
+                        const urgentParentTaskIds = new Set();
+                        allChecklistItems.filter(item => item.isUrgent && !item.completed)
+                            .forEach(item => {
+                                urgentParentTaskIds.add(`${item.parentTask.catIndex}-${item.parentTask.taskIndex}`);
+                            });
+                        
+                        filteredTasks = allTasks.filter(task => urgentParentTaskIds.has(`${task.catIndex}-${task.taskIndex}`));
+
+                    } else {
+                         filteredTasks = allTasks.filter(t => t.status === filter);
+                    }
+
+                    if (title) {
+                        renderFilteredView(filteredTasks, title);
+                    }
+                });
+            });
+
+             function renderFilteredView(tasks, title) {
+                switchView('filteredKanban');
+                const content = document.getElementById('filteredKanbanContent');
+                content.innerHTML = '';
+                
+                const filteredViewTitle = document.createElement('h2');
+                filteredViewTitle.className = "text-2xl font-bold mb-4";
+                filteredViewTitle.textContent = title;
+                content.appendChild(filteredViewTitle);
+
+                if (tasks.length === 0) {
+                    content.innerHTML += '<p class="text-center text-gray-500">ไม่พบงานที่ตรงกับเงื่อนไข</p>';
+                    return;
+                }
+                
+                const taskGrid = document.createElement('div');
+                taskGrid.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4';
+
+                tasks.forEach(task => {
+                    const color = COLORS[task.catIndex % COLORS.length];
+                    const taskCard = createTaskCard(task, task.catIndex, task.taskIndex, color);
+                    taskCard.querySelector('.task-card-content').draggable = false;
+                    taskCard.querySelector('.task-card-content').style.cursor = 'pointer';
+                    taskGrid.appendChild(taskCard);
+                });
+                content.appendChild(taskGrid);
+            }
+
+            backToDashboardBtn.addEventListener('click', () => switchView('dashboard'));
+            
+            backupDataBtn.addEventListener('click', () => {
+                try {
+                    const dataStr = JSON.stringify(data, null, 2); 
+                    const blob = new Blob([dataStr], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    const today = new Date().toISOString().slice(0, 10);
+                    a.href = url;
+                    a.download = `kanban-backup-${today}.json`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                } catch (error) {
+                    console.error("Error backing up data:", error);
+                }
+            });
+
+            restoreDataBtn.addEventListener('click', () => {
+                restoreFileInput.click();
+            });
+
+            restoreFileInput.addEventListener('change', (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+                
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const restoredData = JSON.parse(e.target.result);
+                        if (restoredData && Array.isArray(restoredData.categories)) {
+                            if (confirm('คุณแน่ใจหรือไม่ว่าต้องการกู้คืนข้อมูล? ข้อมูลปัจจุบันจะถูกเขียนทับทั้งหมด')) {
+                                data = restoredData;
+                                saveData();
+                                renderAll();
+                                closeSidebar();
+                            }
+                        } else {
+                            throw new Error("รูปแบบไฟล์สำรองไม่ถูกต้อง");
+                        }
+                    } catch (error) {
+                        console.error("Error restoring data:", error);
+                        alert('เกิดข้อผิดพลาดในการกู้คืนข้อมูล: ' + error.message);
+                    } finally {
+                        restoreFileInput.value = '';
+                    }
+                };
+                reader.readAsText(file);
+            });
+
+            renderAll();
+            showStartupNotification();
+        });
+    </script>
+</body>
+</html>
+
+
