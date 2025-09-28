@@ -345,25 +345,69 @@
         white-space: pre-wrap;
         border-left: 3px solid;
       }
+      .loader {
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #3498db;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+      }
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
       @media print {
+        body {
+          background-image: none;
+        }
+        main {
+          padding: 0;
+        }
+        .no-print,
+        .sidebar,
+        header,
+        .modal {
+          display: none !important;
+        }
         body * {
           visibility: hidden;
         }
-        #print-preview-area,
-        #print-preview-area * {
+        main,
+        main * {
           visibility: visible;
         }
-        #print-preview-area {
+        #dashboardView,
+        #agendaView,
+        #kanbanView,
+        #filteredKanbanView {
+          display: block !important;
           position: absolute;
           left: 0;
           top: 0;
           width: 100%;
-          padding: 1rem;
-          margin: 0;
-          background-color: white;
         }
-        .no-print {
-          display: none !important;
+        .kanban-board {
+          flex-wrap: wrap;
+          width: 100%;
+          padding: 0;
+          gap: 1rem;
+        }
+        .kanban-column {
+          page-break-inside: avoid;
+          box-shadow: none;
+          border: 1px solid #ccc;
+        }
+        .main-content {
+          overflow: visible;
+        }
+        .stat-card {
+          box-shadow: none;
+          border: 1px solid #ccc;
         }
       }
     </style>
@@ -377,7 +421,7 @@
         </button>
       </div>
       <nav id="sidebarMenu" class="sidebar-menu flex-grow"></nav>
-      <div class="p-4 border-t">
+      <div class="p-4 border-t space-y-2 no-print">
         <button
           id="openTrashBtn"
           class="w-full text-left text-gray-600 hover:bg-red-50 hover:text-red-600 p-3 rounded-md transition-colors duration-200 flex items-center gap-3 font-medium"
@@ -389,7 +433,7 @@
     </aside>
     <div id="sidebarOverlay" class="sidebar-overlay"></div>
     <header
-      class="bg-white shadow-md p-4 flex justify-between items-center sticky top-0 z-20"
+      class="bg-white shadow-md p-4 flex justify-between items-center sticky top-0 z-20 no-print"
     >
       <div class="flex items-center gap-4">
         <button id="openSidebarBtn" class="text-gray-600 hover:text-blue-500">
@@ -400,6 +444,12 @@
         </h1>
       </div>
       <div class="flex items-center gap-4">
+        <button
+          id="importNotesBtn"
+          class="bg-violet-500 hover:bg-violet-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105 flex items-center gap-2"
+        >
+          <i class="fa-solid fa-wand-magic-sparkles"></i> นำเข้าอัจฉริยะ
+        </button>
         <button
           id="addTaskBtn"
           class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105 flex items-center gap-2"
@@ -462,8 +512,19 @@
             <h2
               class="text-lg font-bold text-blue-700 flex items-center gap-2 mb-3"
             >
-              <i class="fa-solid fa-star"></i> ต้องทำวันนี้
+              <i class="fa-solid fa-star"></i> วันนี้
             </h2>
+            <h3
+              class="text-md font-semibold text-blue-800/80 mb-2 border-b border-blue-200 pb-1"
+            >
+              ต้องเริ่มทำ
+            </h3>
+            <ul id="startTodayList" class="space-y-2 mb-4"></ul>
+            <h3
+              class="text-md font-semibold text-blue-800/80 mb-2 border-b border-blue-200 pb-1"
+            >
+              ครบกำหนด
+            </h3>
             <ul id="dueTodayList" class="space-y-2"></ul>
           </div>
           <!-- Tomorrow Column -->
@@ -473,6 +534,17 @@
             >
               <i class="fa-solid fa-arrow-right"></i> งานวันพรุ่งนี้
             </h2>
+            <h3
+              class="text-md font-semibold text-gray-800/80 mb-2 border-b border-gray-200 pb-1"
+            >
+              ต้องเริ่มทำ
+            </h3>
+            <ul id="startTomorrowList" class="space-y-2 mb-4"></ul>
+            <h3
+              class="text-md font-semibold text-gray-800/80 mb-2 border-b border-gray-200 pb-1"
+            >
+              ครบกำหนด
+            </h3>
             <ul id="dueTomorrowList" class="space-y-2"></ul>
           </div>
         </div>
@@ -482,7 +554,24 @@
           >
             <i class="fa-solid fa-calendar-week"></i> กำหนดการอื่นๆ
           </h2>
-          <ul id="upcomingList" class="space-y-2"></ul>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <h3
+                class="text-md font-semibold text-gray-800/90 mb-2 border-b pb-1"
+              >
+                ต้องเริ่มทำ
+              </h3>
+              <ul id="startUpcomingList" class="space-y-2"></ul>
+            </div>
+            <div>
+              <h3
+                class="text-md font-semibold text-gray-800/90 mb-2 border-b pb-1"
+              >
+                ครบกำหนด
+              </h3>
+              <ul id="dueUpcomingList" class="space-y-2"></ul>
+            </div>
+          </div>
         </div>
       </div>
       <div id="kanbanView" class="hidden">
@@ -526,7 +615,7 @@
             >
             <textarea
               id="taskContent"
-              rows-4
+              rows="4"
               class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
             ></textarea>
@@ -712,10 +801,21 @@
                   placeholder="เพิ่มรายการใหม่..."
                   required
                 />
+                <!-- MODIFIED: Added Start Date and made both date inputs required -->
+                <input
+                  type="date"
+                  id="newChecklistItemStartDate"
+                  class="shadow-sm border rounded py-1 px-2 text-sm"
+                  required
+                  title="วันที่ต้องเริ่มทำ"
+                />
+                <span class="text-gray-400">&rarr;</span>
                 <input
                   type="date"
                   id="newChecklistItemDueDate"
                   class="shadow-sm border rounded py-1 px-2 text-sm"
+                  required
+                  title="วันที่ต้องเสร็จ"
                 />
                 <button
                   type="submit"
@@ -941,88 +1041,8 @@
         </form>
       </div>
     </div>
-    <div
-      id="editCompletionModal"
-      class="modal fixed inset-0 bg-gray-600 bg-opacity-70 flex items-center justify-center hidden z-[60]"
-    >
-      <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg mx-auto">
-        <h2 class="text-xl font-bold mb-2">แก้ไขข้อมูลการปิดงาน</h2>
-        <p id="editCompletionItemName" class="text-gray-600 mb-4"></p>
-        <form id="editCompletionForm">
-          <input type="hidden" id="editCompletionItemIndices" />
-          <div class="mb-4">
-            <label
-              for="editCompletionDueDate"
-              class="block text-gray-700 text-sm font-bold mb-2"
-              >แก้ไขวันครบกำหนด:</label
-            >
-            <input
-              type="date"
-              id="editCompletionDueDate"
-              class="shadow-sm border rounded w-full py-2 px-3 text-sm"
-            />
-          </div>
-          <div class="mb-4">
-            <label
-              for="editCompletionDetailsText"
-              class="block text-gray-700 text-sm font-bold mb-2"
-              >แก้ไขรายละเอียดการปิดงาน:</label
-            >
-            <textarea
-              id="editCompletionDetailsText"
-              rows="3"
-              class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500"
-            ></textarea>
-          </div>
-          <div class="mb-4">
-            <label
-              for="editCompletionAttachments"
-              class="block text-gray-700 text-sm font-bold mb-2"
-              >แก้ไขไฟล์แนบ:</label
-            >
-            <input
-              type="file"
-              id="editCompletionAttachments"
-              multiple
-              class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
-            />
-            <div
-              id="currentAttachments"
-              class="text-xs text-gray-500 mt-1"
-            ></div>
-          </div>
-          <div class="mb-4">
-            <label
-              for="editReason"
-              class="block text-gray-700 text-sm font-bold mb-2"
-              >เหตุผลในการแก้ไข:</label
-            >
-            <textarea
-              id="editReason"
-              rows="2"
-              class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-              placeholder="กรุณาระบุเหตุผล..."
-            ></textarea>
-          </div>
-          <div class="flex items-center justify-end gap-3">
-            <button
-              type="button"
-              id="cancelEditCompletionBtn"
-              class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-lg"
-            >
-              ยกเลิก
-            </button>
-            <button
-              type="submit"
-              class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg"
-            >
-              บันทึกการแก้ไข
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+    <!-- REMOVED: editCompletionModal is no longer needed -->
+    <!-- MODIFIED: editChecklistItemModal now includes date fields -->
     <div
       id="editChecklistItemModal"
       class="modal fixed inset-0 bg-gray-600 bg-opacity-70 flex items-center justify-center hidden z-[60]"
@@ -1043,6 +1063,34 @@
               class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
             />
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+              <label
+                for="editChecklistItemStartDate"
+                class="block text-gray-700 text-sm font-bold mb-2"
+                >วันที่ต้องเริ่มทำ:</label
+              >
+              <input
+                type="date"
+                id="editChecklistItemStartDate"
+                class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700"
+                required
+              />
+            </div>
+            <div>
+              <label
+                for="editChecklistItemDueDate"
+                class="block text-gray-700 text-sm font-bold mb-2"
+                >วันที่ต้องเสร็จ:</label
+              >
+              <input
+                type="date"
+                id="editChecklistItemDueDate"
+                class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700"
+                required
+              />
+            </div>
           </div>
           <div class="mb-4">
             <label
@@ -1117,20 +1165,27 @@
             </div>
           </div>
         </div>
-        <div class="flex items-center justify-end gap-3 mt-4">
+        <div class="flex items-center justify-end gap-3 mt-4 no-print">
           <button
             type="button"
-            id="copySummaryBtn"
-            class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg"
+            id="exportSummaryJsonBtn"
+            class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2"
           >
-            คัดลอก
+            <i class="fa-solid fa-file-code"></i> Export JSON
+          </button>
+          <button
+            type="button"
+            id="exportSummaryCsvBtn"
+            class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2"
+          >
+            <i class="fa-solid fa-file-csv"></i> Export CSV
           </button>
           <button
             type="button"
             id="printBtn"
-            class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg"
+            class="bg-gray-700 hover:bg-gray-800 text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2"
           >
-            พิมพ์
+            <i class="fa-solid fa-print"></i> พิมพ์
           </button>
           <button
             type="button"
@@ -1222,6 +1277,165 @@
         </div>
       </div>
     </div>
+    <!-- NEW MODAL for Deleting Category -->
+    <div
+      id="deleteCategoryModal"
+      class="modal fixed inset-0 bg-gray-600 bg-opacity-70 flex items-center justify-center hidden z-50"
+    >
+      <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm mx-auto">
+        <h2 class="text-xl font-bold mb-4 flex items-center gap-2">
+          <i class="fa-solid fa-triangle-exclamation text-red-500"></i>
+          ยืนยันการลบ
+        </h2>
+        <p id="deleteCategoryMessage" class="text-gray-600 mb-6"></p>
+        <form id="deleteCategoryForm">
+          <input type="hidden" id="deleteCategoryIndex" />
+          <div class="flex items-center justify-end gap-3">
+            <button
+              type="button"
+              id="cancelDeleteCategoryBtn"
+              class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-lg"
+            >
+              ยกเลิก
+            </button>
+            <button
+              type="submit"
+              id="confirmDeleteCategoryBtn"
+              class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg"
+            >
+              ยืนยันการลบ
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+    <!-- NEW MODAL for Checklist Templates -->
+    <div
+      id="templateModal"
+      class="modal fixed inset-0 bg-gray-600 bg-opacity-70 flex items-center justify-center hidden z-50"
+    >
+      <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg mx-auto">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-xl font-bold" id="templateModalTitle">
+            จัดการเทมเพลตเช็คลิสต์
+          </h2>
+          <button
+            id="closeTemplateModalBtn"
+            class="text-gray-500 hover:text-gray-800 text-3xl leading-none"
+          >
+            &times;
+          </button>
+        </div>
+        <form id="addTemplateItemForm" class="mb-4 flex gap-2">
+          <input type="hidden" id="templateCategoryIndex" />
+          <input
+            type="text"
+            id="newTemplateItemText"
+            class="flex-grow shadow-sm border rounded py-2 px-3 text-sm"
+            placeholder="เพิ่มรายการใหม่ในเทมเพลต..."
+            required
+          />
+          <button
+            type="submit"
+            class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-md text-sm shrink-0"
+          >
+            เพิ่ม
+          </button>
+        </form>
+        <div
+          id="templateList"
+          class="max-h-64 overflow-y-auto space-y-2 p-1"
+        ></div>
+      </div>
+    </div>
+    <!-- NEW: AI Smart Import Modal -->
+    <div
+      id="importNotesModal"
+      class="modal fixed inset-0 bg-gray-600 bg-opacity-50 hidden overflow-y-auto py-12 z-[60]"
+    >
+      <div
+        class="bg-white rounded-lg shadow-xl p-6 w-full max-w-2xl mx-auto transform transition-all"
+      >
+        <div class="flex justify-between items-start mb-4">
+          <h2 class="text-2xl font-bold text-gray-800 flex items-center gap-2">
+            <i class="fa-solid fa-wand-magic-sparkles text-violet-500"></i>
+            นำเข้าอัจฉริยะ
+          </h2>
+          <button
+            id="closeImportModalBtn"
+            class="text-gray-400 hover:text-gray-600"
+          >
+            &times;
+          </button>
+        </div>
+
+        <!-- View 1: Input -->
+        <div id="notes-input-view">
+          <p class="text-gray-600 mb-4">
+            วางโน้ตหรือข้อความที่ต้องการสร้างเป็นงานด้านล่างนี้ AI
+            จะช่วยวิเคราะห์และแยกรายการเช็คลิสต์ให้คุณ
+          </p>
+          <form id="importNotesForm">
+            <textarea
+              id="notesInput"
+              rows="10"
+              class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-violet-400"
+              placeholder="ตัวอย่าง:
+- ประชุมทีม RCOT วันที่ 7-9 ต.ค.
+- แจ้งเรื่อง Workshop ให้พี่ผึ้งภายใน 15 ก.ย.
+- ติดตามเรื่องลงทะเบียน
+- เตรียมบูธ TSVIR ส่งข้อมูลให้ SV และจัดของ..."
+            ></textarea>
+            <div class="mt-4 flex justify-end">
+              <button
+                type="submit"
+                class="bg-violet-500 hover:bg-violet-600 text-white font-bold py-2 px-5 rounded-lg flex items-center gap-2"
+              >
+                <i class="fa-solid fa-brain"></i>
+                ประมวลผล
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- View 2: Loading -->
+        <div id="notes-loading-view" class="hidden text-center py-10">
+          <div class="loader mx-auto"></div>
+          <p class="mt-4 text-gray-600">AI กำลังวิเคราะห์ข้อมูลของคุณ...</p>
+        </div>
+
+        <!-- View 3: Review & Confirm -->
+        <div id="notes-review-view" class="hidden">
+          <p class="text-gray-600 mb-4">
+            นี่คืองานที่ AI สร้างจากโน้ตของคุณ
+            โปรดตรวจสอบและเลือกโปรเจกต์สำหรับแต่ละงาน
+          </p>
+          <div
+            id="ai-generated-tasks"
+            class="space-y-4 max-h-[50vh] overflow-y-auto p-2 bg-gray-50 rounded-lg"
+          >
+            <!-- AI generated tasks will be injected here -->
+          </div>
+          <div class="mt-6 flex justify-end gap-3">
+            <button
+              id="cancelImportBtn"
+              type="button"
+              class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg"
+            >
+              ยกเลิก
+            </button>
+            <button
+              id="confirmImportBtn"
+              type="button"
+              class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-5 rounded-lg flex items-center gap-2"
+            >
+              <i class="fa-solid fa-check-circle"></i>
+              ยืนยันและเพิ่มงาน
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <script>
       const initialData = {
@@ -1244,6 +1458,7 @@
                   {
                     text: "ดึงใบงานถึง 16.49",
                     completed: true,
+                    startDate: "2025-09-24",
                     dueDate: "2025-09-24",
                     description: "",
                     isUrgent: false,
@@ -1269,6 +1484,7 @@
                   {
                     text: "รีมายด์ 2 งาน",
                     completed: false,
+                    startDate: "2025-09-24",
                     dueDate: "2025-09-24",
                     description: "",
                     isUrgent: false,
@@ -1289,6 +1505,7 @@
                   {
                     text: "ติดต่อประสานงาน",
                     completed: false,
+                    startDate: "2025-09-24",
                     dueDate: "2025-09-24",
                     description: "",
                     isUrgent: false,
@@ -1296,6 +1513,10 @@
                   },
                 ],
               },
+            ],
+            checklistTemplate: [
+              { text: "ตรวจสอบอีเมล" },
+              { text: "ตอบกลับผู้ที่เกี่ยวข้อง" },
             ],
           },
           {
@@ -1315,6 +1536,7 @@
                   {
                     text: "ติดตามใบเสร็จ 50,000 บาท (โอน 16.09.68)",
                     completed: false,
+                    startDate: "2025-09-25",
                     dueDate: "2025-09-25",
                     description: "",
                     isUrgent: true,
@@ -1335,6 +1557,7 @@
                   {
                     text: "ใบเสร็จค่าบูธ 80,000 (จ่าย 22.08.68)",
                     completed: false,
+                    startDate: "2025-09-25",
                     dueDate: "2025-09-25",
                     description: "",
                     isUrgent: false,
@@ -1343,6 +1566,7 @@
                   {
                     text: "ใบเสร็จค่าห้องพัก นพ.สิริฤทธิ์ 13,500 (จ่าย 18.09.68)",
                     completed: false,
+                    startDate: "2025-09-25",
                     dueDate: "2025-09-25",
                     description: "รร millenniumHilton bangkok",
                     isUrgent: false,
@@ -1363,6 +1587,7 @@
                   {
                     text: "ใบเสร็จค่าห้องพัก 8,000 (โอน 22.7.68)",
                     completed: false,
+                    startDate: "2025-09-25",
                     dueDate: "2025-09-25",
                     description: "",
                     isUrgent: false,
@@ -1371,179 +1596,8 @@
                   {
                     text: "ใบเสร็จค่าบูธ 50,000 (โอน 22.7.68)",
                     completed: false,
+                    startDate: "2025-09-25",
                     dueDate: "2025-09-25",
-                    description: "",
-                    isUrgent: false,
-                    updates: [],
-                  },
-                ],
-              },
-              {
-                content: "A-PHPB: ติดตามใบเสร็จ Workshop",
-                assigner: "พี่แหม่ม",
-                coordinator: "",
-                history: [],
-                isNew: true,
-                status: "pending",
-                isUrgent: false,
-                createdAt: "2025-07-23T09:00:00.000Z",
-                checklist: [
-                  {
-                    text: "แพทย์ขอนแก่น 25,993 (จ่าย 23.07.68)",
-                    completed: false,
-                    dueDate: "2025-09-25",
-                    description: "",
-                    isUrgent: false,
-                    updates: [],
-                  },
-                  {
-                    text: "แพทย์รพ.สรรพสิทธิประสงค์ 26,216.90 (จ่าย 29.07.68)",
-                    completed: false,
-                    dueDate: "2025-09-25",
-                    description: "",
-                    isUrgent: false,
-                    updates: [],
-                  },
-                ],
-              },
-              {
-                content: "Endo/Andro 2025: ติดตามใบเสร็จ",
-                assigner: "พี่แหม่ม",
-                coordinator: "Booking/รร.",
-                history: [],
-                isNew: true,
-                status: "pending",
-                isUrgent: false,
-                createdAt: "2025-07-11T09:00:00.000Z",
-                checklist: [
-                  {
-                    text: "ใบกำกับภาษี Booking ห้องพี่ผึ้ง พี่พี",
-                    completed: false,
-                    dueDate: "2025-09-25",
-                    description: "รร.แจ้งว่าขอได้ก่อนวันเช็คอิน",
-                    isUrgent: false,
-                    updates: [],
-                  },
-                  {
-                    text: "ใบเสร็จค่าบูธ (เมดโฟ 1, โปรฟาวด์ 1)",
-                    completed: false,
-                    dueDate: "2025-09-25",
-                    description: "ชำระ 16.7.68",
-                    isUrgent: false,
-                    updates: [],
-                  },
-                ],
-              },
-              {
-                content: "IASGO Thailand 2025: ติดตามใบเสร็จ",
-                assigner: "พี่แหม่ม",
-                coordinator: "สมาคม",
-                history: [],
-                isNew: true,
-                status: "pending",
-                isUrgent: false,
-                createdAt: "2025-08-15T09:00:00.000Z",
-                checklist: [
-                  {
-                    text: "ใบเสร็จ 60,000 (ชำระ 15.08.68)",
-                    completed: false,
-                    dueDate: "2025-09-25",
-                    description: "",
-                    isUrgent: false,
-                    updates: [],
-                  },
-                ],
-              },
-              {
-                content: "7th USAM 2025: ติดตามใบเสร็จ",
-                assigner: "พี่แหม่ม",
-                coordinator: "เมดโฟกัส",
-                history: [],
-                isNew: true,
-                status: "pending",
-                isUrgent: false,
-                createdAt: "2025-08-29T09:00:00.000Z",
-                checklist: [
-                  {
-                    text: "ใบเสร็จค่าบูธ 60,000 (จ่าย 29.08.68)",
-                    completed: false,
-                    dueDate: "2025-09-25",
-                    description: "",
-                    isUrgent: false,
-                    updates: [],
-                  },
-                ],
-              },
-              {
-                content: "RCOT 2/2025: ติดตามใบเสร็จ",
-                assigner: "พี่แหม่ม",
-                coordinator: "สมาคม",
-                history: [],
-                isNew: true,
-                status: "pending",
-                isUrgent: false,
-                createdAt: "2025-08-29T09:00:00.000Z",
-                checklist: [
-                  {
-                    text: "ใบเสร็จ 40,000 (ชำระ 29.8.68)",
-                    completed: false,
-                    dueDate: "2025-09-20",
-                    description: "",
-                    isUrgent: false,
-                    updates: [],
-                  },
-                ],
-              },
-              {
-                content: "TUMISS: ติดตามใบเสร็จ",
-                assigner: "พี่แหม่ม",
-                coordinator: "สมาคม",
-                history: [],
-                isNew: true,
-                status: "pending",
-                isUrgent: false,
-                createdAt: "2025-09-10T09:00:00.000Z",
-                checklist: [
-                  {
-                    text: "ใบเสร็จค่าบูธ โปรฟาวด์ 25,000 (ชำระ 10.09.68)",
-                    completed: false,
-                    dueDate: "2025-09-20",
-                    description: "",
-                    isUrgent: false,
-                    updates: [],
-                  },
-                  {
-                    text: "ใบเสร็จค่าบูธ เมดโฟกัส 25,000 (ชำระ 12.09.68)",
-                    completed: false,
-                    dueDate: "2025-09-20",
-                    description: "",
-                    isUrgent: false,
-                    updates: [],
-                  },
-                ],
-              },
-              {
-                content: "ยูโรส่วนภูมิภาค ครั้งที่ 10: ติดตามใบเสร็จ",
-                assigner: "พี่แหม่ม",
-                coordinator: "สมาคม",
-                history: [],
-                isNew: true,
-                status: "pending",
-                isUrgent: false,
-                createdAt: "2025-09-10T09:00:00.000Z",
-                checklist: [
-                  {
-                    text: "ใบเสร็จค่าบูธ โปรฟาวด์ 35,000 (ชำระ 10.09.68)",
-                    completed: false,
-                    dueDate: "2025-09-20",
-                    description: "",
-                    isUrgent: false,
-                    updates: [],
-                  },
-                  {
-                    text: "ใบเสร็จค่าบูธ เมดโฟกัส 35,000 (ชำระ 12.09.68)",
-                    completed: false,
-                    dueDate: "2025-09-20",
                     description: "",
                     isUrgent: false,
                     updates: [],
@@ -1551,791 +1605,31 @@
                 ],
               },
             ],
+            checklistTemplate: [],
           },
           {
             title: "งานประชุม",
-            tasks: [
-              {
-                content: "RCOT (7-9 ต.ค. 68)",
-                assigner: "พี่ผึ้ง",
-                coordinator: "พี่ผึ้ง",
-                history: [],
-                isNew: true,
-                status: "in-progress",
-                isUrgent: false,
-                createdAt: "2025-08-13T09:00:00.000Z",
-                startedAt: "2025-09-15T10:00:00.000Z",
-                checklist: [
-                  {
-                    text: "แจ้งความประสงค์ Workshop",
-                    completed: true,
-                    dueDate: "2025-09-15",
-                    description: "หมดเขต 15 ก.ย. 68",
-                    isUrgent: false,
-                    completionDetails: {
-                      text: "เสร็จสิ้นแล้ว",
-                      attachments: [],
-                      timestamp: "15/09/2025 10:00",
-                    },
-                    updates: [],
-                  },
-                  {
-                    text: "แจ้งพี่ผึ้งเรื่องลงทะเบียน",
-                    completed: false,
-                    dueDate: "2025-09-30",
-                    description: "รีมาย 30.09.68",
-                    isUrgent: false,
-                    updates: [],
-                  },
-                ],
-              },
-              {
-                content: "TSVIR 2025 (9-11 ต.ค. 68)",
-                assigner: "พี่นก/พี่มิ้ม",
-                coordinator: "คุณนุ้ย",
-                history: [],
-                isNew: true,
-                status: "in-progress",
-                isUrgent: false,
-                createdAt: "2025-09-01T09:00:00.000Z",
-                startedAt: "2025-09-23T10:00:00.000Z",
-                checklist: [
-                  {
-                    text: "ประชุมเลือกตำแหน่งบูธ (ได้ S5)",
-                    completed: true,
-                    dueDate: "2025-09-23",
-                    description: "พี่มิ้มลาป่วย",
-                    isUrgent: false,
-                    completionDetails: {
-                      text: "ได้บูธ S5",
-                      attachments: [],
-                      timestamp: "23/09/2025 10:00",
-                    },
-                    updates: [],
-                  },
-                  {
-                    text: "ชำระค่าลงทะเบียน",
-                    completed: false,
-                    dueDate: "2025-09-25",
-                    description:
-                      "รออินวอย / ตั้งเบิก / เซ็นอนุมัติ / โอน / ส่งสลิป / ติดตามใบเสร็จ",
-                    isUrgent: false,
-                    updates: [],
-                  },
-                  {
-                    text: "นำส่งแบบฟอร์มรายละเอียดให้ผู้จัดงาน",
-                    completed: false,
-                    dueDate: "2025-10-01",
-                    description: "",
-                    isUrgent: false,
-                    updates: [],
-                  },
-                ],
-              },
-              {
-                content: "Southern Urology Society 2025 (12 ต.ค. 25)",
-                assigner: "พี่พี",
-                coordinator: "พี่อู๋/พี่นก",
-                history: [],
-                isNew: true,
-                status: "in-progress",
-                isUrgent: false,
-                createdAt: "2025-09-17T09:00:00.000Z",
-                startedAt: "2025-09-18T10:00:00.000Z",
-                checklist: [
-                  {
-                    text: "จองบูธและส่งแบบตอบรับ",
-                    completed: true,
-                    dueDate: "2025-09-18",
-                    description: "พี่พีเซ็นอนุมัติ",
-                    isUrgent: false,
-                    completionDetails: {
-                      text: "ส่งอีเมลแล้ว",
-                      attachments: [],
-                      timestamp: "18/09/2025 10:00",
-                    },
-                    updates: [],
-                  },
-                  {
-                    text: "ตั้งเบิกค่าบูธ",
-                    completed: false,
-                    dueDate: "2025-09-29",
-                    description: "",
-                    isUrgent: false,
-                    updates: [],
-                  },
-                  {
-                    text: "ขอเอกสารเช็คลิสจากพี่อู๋ BU1 (โปรฟาวด์)",
-                    completed: false,
-                    dueDate: "2025-09-22",
-                    description: "ได้รับไฟล์แสกน COOK แล้ว",
-                    isUrgent: false,
-                    updates: [],
-                  },
-                  {
-                    text: "ขอเอกสารเช็คลิสจากพี่นก BU2",
-                    completed: false,
-                    dueDate: "2025-09-24",
-                    description: "",
-                    isUrgent: false,
-                    updates: [],
-                  },
-                ],
-              },
-              {
-                content: "7th USAM (20-21 ต.ค. 68)",
-                assigner: "พี่นก",
-                coordinator: "พี่นก/พี่โอปอ",
-                history: [],
-                isNew: true,
-                status: "pending",
-                isUrgent: false,
-                createdAt: "2025-09-01T09:00:00.000Z",
-                checklist: [
-                  {
-                    text: "ติดตามเช็คลิสต์จากพี่นก",
-                    completed: false,
-                    dueDate: "2025-10-01",
-                    description: "ได้รับตัวจริงของพี่โอปอแล้ว",
-                    isUrgent: false,
-                    updates: [],
-                  },
-                  {
-                    text: "รีมายด์พี่นกเรื่องลงทะเบียน (ไม่มีลงฟรี)",
-                    completed: false,
-                    dueDate: "2025-10-03",
-                    description: "",
-                    isUrgent: false,
-                    updates: [],
-                  },
-                ],
-              },
-              {
-                content: "Endo/Andro 2025 (23-24 ต.ค. 68)",
-                assigner: "พี่ผึ้ง",
-                coordinator: "พี่มิ้ม",
-                history: [],
-                isNew: true,
-                status: "pending",
-                isUrgent: false,
-                createdAt: "2025-07-18T09:00:00.000Z",
-                checklist: [
-                  {
-                    text: "รีมายด์พี่มิ้มเรื่องเช็คลิสต์",
-                    completed: false,
-                    dueDate: "2025-10-01",
-                    description: "",
-                    isUrgent: false,
-                    updates: [],
-                  },
-                  {
-                    text: "ทำเรื่องตั้งเบิกค่าบูธ",
-                    completed: false,
-                    dueDate: "",
-                    description: "รออินวอย",
-                    isUrgent: false,
-                    updates: [],
-                  },
-                ],
-              },
-              {
-                content: "A-PHPBA 2025 (28-31 ต.ค. 68)",
-                assigner: "พี่เติร์ด",
-                coordinator: "SV/ปลื้ม",
-                history: [],
-                isNew: true,
-                status: "pending",
-                isUrgent: false,
-                createdAt: "2025-09-24T09:00:00.000Z",
-                checklist: [
-                  {
-                    text: "ติดตามดีไซน์ก่อสร้างบูธจากพี่เติร์ด",
-                    completed: false,
-                    dueDate: "2025-09-30",
-                    description: "",
-                    isUrgent: false,
-                    updates: [],
-                  },
-                  {
-                    text: "ตั้งเบิกค่ากระแสไฟฟ้า",
-                    completed: false,
-                    dueDate: "",
-                    description: "รออินวอยแก้ไข",
-                    isUrgent: false,
-                    updates: [],
-                  },
-                ],
-              },
-              {
-                content: "TUMISS (30-31 ต.ค. 68)",
-                assigner: "พี่พี",
-                coordinator: "พั้นธ์",
-                history: [],
-                isNew: true,
-                status: "pending",
-                isUrgent: false,
-                createdAt: "2025-09-15T09:00:00.000Z",
-                checklist: [
-                  {
-                    text: "ติดตามเช็คลิสต์จากพั้นธ์",
-                    completed: false,
-                    dueDate: "",
-                    description: "รอพี่พีเซ็น",
-                    isUrgent: false,
-                    updates: [],
-                  },
-                ],
-              },
-              {
-                content: "All Things Emergency (17-18 พ.ย. 68)",
-                assigner: "พี่นก",
-                coordinator: "เตย",
-                history: [],
-                isNew: true,
-                status: "in-progress",
-                isUrgent: false,
-                createdAt: "2025-09-12T09:00:00.000Z",
-                startedAt: "2025-09-12T10:00:00.000Z",
-                checklist: [
-                  {
-                    text: "จองบูธ",
-                    completed: true,
-                    dueDate: "2025-09-12",
-                    isUrgent: false,
-                    completionDetails: {
-                      text: "จองแล้ว",
-                      attachments: [],
-                      timestamp: "12/09/2025 10:00",
-                    },
-                    updates: [],
-                  },
-                  {
-                    text: "ตั้งเบิกค่าบูธ",
-                    completed: true,
-                    dueDate: "2025-09-16",
-                    isUrgent: false,
-                    completionDetails: {
-                      text: "พี่แหม่มโอนแล้ว",
-                      attachments: [],
-                      timestamp: "16/09/2025",
-                    },
-                    updates: [],
-                  },
-                  {
-                    text: "รีมายเช็คลิสต์พี่นก",
-                    completed: false,
-                    dueDate: "2025-09-25",
-                    description: "",
-                    isUrgent: false,
-                    updates: [],
-                  },
-                  {
-                    text: "ติดตามกำหนดการของงานจากเตย",
-                    completed: false,
-                    dueDate: "",
-                    description: "",
-                    isUrgent: false,
-                    updates: [],
-                  },
-                ],
-              },
-              {
-                content: "IASGO Thailand 2025 (22-23 พ.ย. 25)",
-                assigner: "พี่มิ้ม",
-                coordinator: "",
-                history: [],
-                isNew: true,
-                status: "pending",
-                isUrgent: false,
-                createdAt: "2025-08-26T09:00:00.000Z",
-                checklist: [
-                  {
-                    text: "ติดตามเช็คลิสต์พี่มิ้ม",
-                    completed: false,
-                    dueDate: "2025-09-26",
-                    description: "",
-                    isUrgent: false,
-                    updates: [],
-                  },
-                ],
-              },
-              {
-                content: "ROU (29-30 พ.ย. 68)",
-                assigner: "พี่นก",
-                coordinator: "พี่โอปอ",
-                history: [],
-                isNew: true,
-                status: "pending",
-                isUrgent: false,
-                createdAt: "2025-09-01T09:00:00.000Z",
-                checklist: [
-                  {
-                    text: "ติดตามเช็คลิสต์พี่นก",
-                    completed: false,
-                    dueDate: "2025-09-25",
-                    description: "ได้รับตัวจริงของพี่โอปอแล้ว",
-                    isUrgent: false,
-                    updates: [],
-                  },
-                  {
-                    text: "รีมายพี่นกเรื่องจับฉลากบูธ",
-                    completed: false,
-                    dueDate: "2025-10-06",
-                    description: "จับฉลากวันที่ 8 ต.ค. 68",
-                    isUrgent: false,
-                    updates: [],
-                  },
-                ],
-              },
-              {
-                content: "CMU Neurosurgery Forum 2025 (8-9 ธ.ค. 68)",
-                assigner: "พี่แหม่ม",
-                coordinator: "พี่ปาล์ม/พี่นก",
-                history: [],
-                isNew: true,
-                status: "pending",
-                isUrgent: false,
-                createdAt: "2025-09-01T09:00:00.000Z",
-                checklist: [
-                  {
-                    text: "แจ้งพี่แหม่มตั้งเบิกค่าบูธ",
-                    completed: false,
-                    dueDate: "2025-11-10",
-                    description: "กำหนดชำระ 15.11.68",
-                    isUrgent: false,
-                    updates: [],
-                  },
-                  {
-                    text: "รีมายเช็คลิสต์พี่ปาล์ม/พี่นก",
-                    completed: false,
-                    dueDate: "2025-09-25",
-                    description: "ของพี่ปาล์มได้ไฟล์แล้ว",
-                    isUrgent: false,
-                    updates: [],
-                  },
-                ],
-              },
-              {
-                content: "NORTHERN URO CONNECTION (NUC) 2025 (11-12 ธ.ค. 68)",
-                assigner: "พี่แหม่ม",
-                coordinator: "พี่แจ็ค/พี่นก",
-                history: [],
-                isNew: true,
-                status: "pending",
-                isUrgent: false,
-                createdAt: "2025-09-01T09:00:00.000Z",
-                checklist: [
-                  {
-                    text: "ตั้งเบิกค่าบูธ",
-                    completed: false,
-                    dueDate: "2025-11-01",
-                    description: "",
-                    isUrgent: false,
-                    updates: [],
-                  },
-                  {
-                    text: "รีมายเช็คลิสต์พี่แจ็ค/พี่นก",
-                    completed: false,
-                    dueDate: "2025-09-25",
-                    description: "ของพี่แจ็คได้ไฟล์แล้ว",
-                    isUrgent: false,
-                    updates: [],
-                  },
-                ],
-              },
-              {
-                content: "11th MS FORUM 2025 (20-21 ธ.ค. 25)",
-                assigner: "พี่ผึ้ง",
-                coordinator: "",
-                history: [],
-                isNew: true,
-                status: "pending",
-                isUrgent: false,
-                createdAt: "2025-09-16T09:00:00.000Z",
-                checklist: [
-                  {
-                    text: "รีมายแจ้งข่าวงานประชุมกับพี่ผึ้ง",
-                    completed: false,
-                    dueDate: "2025-09-24",
-                    description: "",
-                    isUrgent: false,
-                    updates: [],
-                  },
-                ],
-              },
-              {
-                content: "4th TSHNO Annual conference (8-9 ธ.ค. 68)",
-                assigner: "พี่นก/พี่ผึ้ง",
-                coordinator: "คุณสมพร",
-                history: [],
-                isNew: true,
-                status: "pending",
-                isUrgent: false,
-                createdAt: "2025-10-30T09:00:00.000Z",
-                checklist: [
-                  {
-                    text: "คุยกับพี่ผึ้งว่าจะให้ส่งแบบฟอร์มไปก่อนไหม",
-                    completed: false,
-                    dueDate: "",
-                    description: "คุณสมพรแจ้งรอหลัง 30.10.68",
-                    isUrgent: false,
-                    updates: [],
-                  },
-                ],
-              },
-              {
-                content:
-                  "ประชุมวิชาการ “ยูโรส่วนภูมิภาค ครั้งที่ 10” (29-30 ม.ค. 69)",
-                assigner: "",
-                coordinator: "พั้นธ์",
-                history: [],
-                isNew: true,
-                status: "pending",
-                isUrgent: false,
-                createdAt: "2025-08-29T09:00:00.000Z",
-                checklist: [
-                  {
-                    text: "ติดตามเช็คลิสต์จากพั้นธ์",
-                    completed: false,
-                    dueDate: "2025-09-30",
-                    description: "",
-                    isUrgent: false,
-                    updates: [],
-                  },
-                ],
-              },
-              {
-                content: "ประชุมวิชาการประจำปี 2569 (2-4 มี.ค 69)",
-                assigner: "พี่ผึ้ง",
-                coordinator: "",
-                history: [],
-                isNew: true,
-                status: "pending",
-                isUrgent: false,
-                createdAt: "2025-09-18T09:00:00.000Z",
-                checklist: [
-                  {
-                    text: "รีมายอีเมลพี่ผึ้ง",
-                    completed: false,
-                    dueDate: "2025-09-24",
-                    description: "",
-                    isUrgent: false,
-                    updates: [],
-                  },
-                ],
-              },
+            tasks: [],
+            checklistTemplate: [
+              { text: "จองบูธและส่งแบบตอบรับ" },
+              { text: "ตั้งเบิกค่าบูธ" },
+              { text: "ขอเอกสารเช็คลิสต์" },
+              { text: "ติดตามใบเสร็จ" },
             ],
           },
           {
             title: "งานจัดบูธ",
-            tasks: [
-              {
-                content: "เตรียมบูธ RCOT (7-9 ต.ค. 68)",
-                assigner: "",
-                coordinator: "SV",
-                history: [],
-                isNew: true,
-                status: "pending",
-                isUrgent: false,
-                createdAt: "2025-09-19T09:00:00.000Z",
-                checklist: [
-                  {
-                    text: "ส่งข้อมูลให้ SV",
-                    completed: false,
-                    dueDate: "",
-                    description: "",
-                    isUrgent: false,
-                    updates: [],
-                  },
-                  {
-                    text: "เตรียม Exhibition และ จัดของ",
-                    completed: false,
-                    dueDate: "",
-                    description: "",
-                    isUrgent: false,
-                    updates: [],
-                  },
-                  {
-                    text: "ทำใบปะหน้ากล่อง",
-                    completed: false,
-                    dueDate: "",
-                    description: "",
-                    isUrgent: false,
-                    updates: [],
-                  },
-                ],
-              },
-              {
-                content: "เตรียมบูธ TSVIR 2025 (9-11 ต.ค. 68)",
-                assigner: "",
-                coordinator: "SV/ปลื้ม",
-                history: [],
-                isNew: true,
-                status: "pending",
-                isUrgent: false,
-                createdAt: "2025-09-23T09:00:00.000Z",
-                checklist: [
-                  {
-                    text: "ส่งข้อมูลให้ SV",
-                    completed: false,
-                    dueDate: "",
-                    description: "",
-                    isUrgent: false,
-                    updates: [],
-                  },
-                  {
-                    text: "ลงเบรคดร๊อปให้ปลื้ม",
-                    completed: false,
-                    dueDate: "",
-                    description: "",
-                    isUrgent: false,
-                    updates: [],
-                  },
-                  {
-                    text: "เตรียม Exhibition และ จัดของ",
-                    completed: false,
-                    dueDate: "",
-                    description: "",
-                    isUrgent: false,
-                    updates: [],
-                  },
-                  {
-                    text: "ทำใบปะหน้ากล่อง",
-                    completed: false,
-                    dueDate: "",
-                    description: "",
-                    isUrgent: false,
-                    updates: [],
-                  },
-                ],
-              },
+            tasks: [],
+            checklistTemplate: [
+              { text: "ส่งข้อมูลให้ SV" },
+              { text: "เตรียม Exhibition และ จัดของ" },
+              { text: "ทำใบปะหน้ากล่อง" },
             ],
           },
-          {
-            title: "ใบเสนอราคา",
-            tasks: [
-              {
-                content: "รพ.เกษมราษฎร์: ขอข้อมูลและใบเสนอราคา",
-                assigner: "",
-                coordinator: "พี่นก",
-                history: [],
-                isNew: true,
-                status: "pending",
-                isUrgent: false,
-                createdAt: "2025-09-24T09:00:00.000Z",
-                checklist: [
-                  {
-                    text: "รอพี่นกดูข้อมูล",
-                    completed: false,
-                    dueDate: "",
-                    description: "",
-                    isUrgent: false,
-                    updates: [],
-                  },
-                ],
-              },
-            ],
-          },
-          {
-            title: "วีซ่า",
-            tasks: [
-              {
-                content: "ดำเนินการเรื่องวีซ่า",
-                assigner: "",
-                coordinator: "เตย",
-                history: [],
-                isNew: true,
-                status: "pending",
-                isUrgent: false,
-                createdAt: "2025-09-24T09:00:00.000Z",
-                checklist: [
-                  {
-                    text: "ตั้งเบิกค่าวีซ่า + ค่าประกัน",
-                    completed: false,
-                    dueDate: "",
-                    description: "แสกนได้แต่ของเตย",
-                    isUrgent: false,
-                    updates: [],
-                  },
-                ],
-              },
-            ],
-          },
-          {
-            title: "จองห้องพัก",
-            tasks: [
-              {
-                content: "จองห้องพัก นพ.สิริฤทธิ์ (งาน TSVIR)",
-                assigner: "",
-                coordinator: "",
-                history: [],
-                isNew: true,
-                status: "completed",
-                isUrgent: false,
-                createdAt: "2025-09-18T09:00:00.000Z",
-                startedAt: "2025-09-18T10:00:00.000Z",
-                completedAt: "2025-09-18T11:00:00.000Z",
-                checklist: [
-                  {
-                    text: "จองห้องพัก รพ.จุรีเวช",
-                    completed: true,
-                    dueDate: "2025-09-18",
-                    description: "ชำระเงินแล้ว 13,500 วันที่ 18.09.68",
-                    isUrgent: false,
-                    completionDetails: {
-                      text: "ชำระแล้ว",
-                      attachments: [],
-                      timestamp: "18/09/2025",
-                    },
-                    updates: [],
-                  },
-                ],
-              },
-              {
-                content: "จองโรงแรมให้ นพ.มานพ",
-                assigner: "พี่ผึ้ง",
-                coordinator: "พี่แหม่ม",
-                history: [],
-                isNew: true,
-                status: "in-progress",
-                isUrgent: false,
-                createdAt: "2025-09-23T09:00:00.000Z",
-                startedAt: "2025-09-23T10:00:00.000Z",
-                checklist: [
-                  {
-                    text: "ทำเรื่องตั้งเบิก",
-                    completed: false,
-                    dueDate: "2025-09-23",
-                    description: "รร. มิราเคิล สุวรรณภูมิ แอร์พอร์ต",
-                    isUrgent: false,
-                    updates: [],
-                  },
-                ],
-              },
-            ],
-          },
-          {
-            title: "สั่งทำ/อื่นๆ",
-            tasks: [
-              {
-                content: "สั่งทำกระเป๋า",
-                assigner: "พี่ผึ้ง",
-                coordinator: "ร้านอินดีทีเชิต",
-                history: [],
-                isNew: true,
-                status: "in-progress",
-                isUrgent: false,
-                createdAt: "2025-09-19T09:00:00.000Z",
-                startedAt: "2025-09-22T10:00:00.000Z",
-                checklist: [
-                  {
-                    text: "ส่งแบบให้ร้าน",
-                    completed: true,
-                    dueDate: "2025-09-22",
-                    isUrgent: false,
-                    completionDetails: {
-                      text: "เลือกร้านแล้ว",
-                      attachments: [],
-                      timestamp: "22/09/2025 10:00",
-                    },
-                    updates: [],
-                  },
-                  {
-                    text: "ส่งโลโก้ให้พี่ผึ้งดูก่อน",
-                    completed: false,
-                    dueDate: "2025-09-24",
-                    description:
-                      "พี่ผึ้งอยากได้ logo ทุกยี่ห้อ มากระจาย บนกระเป๋า",
-                    isUrgent: false,
-                    updates: [],
-                  },
-                ],
-              },
-              {
-                content: "สั่งทำอะคริลิคแขวน Stent (cook)",
-                assigner: "พี่พี",
-                coordinator: "ร้านควอลิตี้",
-                history: [],
-                isNew: true,
-                status: "in-progress",
-                isUrgent: false,
-                createdAt: "2025-09-19T09:00:00.000Z",
-                startedAt: "2025-09-19T10:00:00.000Z",
-                checklist: [
-                  {
-                    text: "คอนเฟิร์มสั่งทำของ",
-                    completed: false,
-                    dueDate: "",
-                    description: "รอคุยกับพี่พีใหม่",
-                    isUrgent: false,
-                    updates: [],
-                  },
-                  {
-                    text: "ตั้งเบิก",
-                    completed: false,
-                    dueDate: "",
-                    description: "",
-                    isUrgent: false,
-                    updates: [],
-                  },
-                ],
-              },
-              {
-                content: "สั่งทำ Backdrop 2 งาน (พั้นธ์)",
-                assigner: "พั้นธ์",
-                coordinator: "พี่บุ๊ค",
-                history: [],
-                isNew: true,
-                status: "completed",
-                isUrgent: false,
-                createdAt: "2025-09-15T09:00:00.000Z",
-                startedAt: "2025-09-17T10:00:00.000Z",
-                completedAt: "2025-09-18T10:00:00.000Z",
-                checklist: [
-                  {
-                    text: "ติดตามไฟล์จากพั้นธ์",
-                    completed: true,
-                    dueDate: "2025-09-18",
-                    isUrgent: false,
-                    completionDetails: {
-                      text: "เรียบร้อย",
-                      attachments: [],
-                      timestamp: "18/09/2025 10:00",
-                    },
-                    updates: [],
-                  },
-                ],
-              },
-              {
-                content: "สั่งทำ Backdrop 2 งาน (พี่มิ้ม)",
-                assigner: "พี่มิ้ม",
-                coordinator: "พี่บุ๊ค/พี่ผึ้ง",
-                history: [],
-                isNew: true,
-                status: "pending",
-                isUrgent: false,
-                createdAt: "2025-09-17T09:00:00.000Z",
-                checklist: [
-                  {
-                    text: "รีมายพี่ผึ้ง/พี่บุ๊ค (RCST)",
-                    completed: false,
-                    dueDate: "2025-09-25",
-                    description: "",
-                    isUrgent: false,
-                    updates: [],
-                  },
-                  {
-                    text: "รีมายพี่ผึ้ง (TSVIR)",
-                    completed: false,
-                    dueDate: "2025-09-25",
-                    description: "",
-                    isUrgent: false,
-                    updates: [],
-                  },
-                ],
-              },
-            ],
-          },
+          { title: "ใบเสนอราคา", tasks: [], checklistTemplate: [] },
+          { title: "วีซ่า", tasks: [], checklistTemplate: [] },
+          { title: "จองห้องพัก", tasks: [], checklistTemplate: [] },
+          { title: "สั่งทำ/อื่นๆ", tasks: [], checklistTemplate: [] },
         ],
         trash: [],
       };
@@ -2361,9 +1655,6 @@
           "completeChecklistItemModal"
         );
         const updateItemModal = document.getElementById("updateItemModal");
-        const editCompletionModal = document.getElementById(
-          "editCompletionModal"
-        );
         const editChecklistItemModal = document.getElementById(
           "editChecklistItemModal"
         );
@@ -2423,11 +1714,6 @@
         const cancelUpdateItemBtn = document.getElementById(
           "cancelUpdateItemBtn"
         );
-        const editCompletionForm =
-          document.getElementById("editCompletionForm");
-        const cancelEditCompletionBtn = document.getElementById(
-          "cancelEditCompletionBtn"
-        );
         const editChecklistItemForm = document.getElementById(
           "editChecklistItemForm"
         );
@@ -2437,7 +1723,6 @@
         const printSummaryBtn = document.getElementById("printSummaryBtn");
         const cancelSummaryBtn = document.getElementById("cancelSummaryBtn");
         const printBtn = document.getElementById("printBtn");
-        const copySummaryBtn = document.getElementById("copySummaryBtn");
         const notificationModal = document.getElementById("notificationModal");
         const closeNotificationBtn = document.getElementById(
           "closeNotificationBtn"
@@ -2451,11 +1736,42 @@
         const confirmPrintBtn = document.getElementById("confirmPrintBtn");
         const cancelPreviewBtn = document.getElementById("cancelPreviewBtn");
         const closePreviewBtn = document.getElementById("closePreviewBtn");
+        // --- New Modal Selectors ---
+        const deleteCategoryModal = document.getElementById(
+          "deleteCategoryModal"
+        );
+        const deleteCategoryForm =
+          document.getElementById("deleteCategoryForm");
+        const cancelDeleteCategoryBtn = document.getElementById(
+          "cancelDeleteCategoryBtn"
+        );
+        const templateModal = document.getElementById("templateModal");
+        const addTemplateItemForm = document.getElementById(
+          "addTemplateItemForm"
+        );
+        const closeTemplateModalBtn = document.getElementById(
+          "closeTemplateModalBtn"
+        );
+        const importNotesBtn = document.getElementById("importNotesBtn");
+        const importNotesModal = document.getElementById("importNotesModal");
+        const closeImportModalBtn = document.getElementById(
+          "closeImportModalBtn"
+        );
+        const importNotesForm = document.getElementById("importNotesForm");
+        const cancelImportBtn = document.getElementById("cancelImportBtn");
+        const confirmImportBtn = document.getElementById("confirmImportBtn");
+        const exportSummaryJsonBtn = document.getElementById(
+          "exportSummaryJsonBtn"
+        );
+        const exportSummaryCsvBtn = document.getElementById(
+          "exportSummaryCsvBtn"
+        );
 
         let data =
-          JSON.parse(localStorage.getItem("kanbanData-v21")) || initialData;
+          JSON.parse(localStorage.getItem("kanbanData-v22")) || initialData;
         let draggedItem = null;
         let taskChart = null;
+        let currentTaskForSummary = null; // NEW: To hold the task object for the summary modal
 
         taskDetailModal.addEventListener("click", (e) => {
           const downloadBtn = e.target.closest(".download-attachment-btn");
@@ -2480,7 +1796,7 @@
 
         // --- Core Functions ---
         function saveData() {
-          localStorage.setItem("kanbanData-v21", JSON.stringify(data));
+          localStorage.setItem("kanbanData-v22", JSON.stringify(data));
         }
         function renderAll() {
           renderBoard();
@@ -2594,7 +1910,11 @@
             columnEl.innerHTML = `
                         <div class="column-header" style="color: ${color};">
                             <span class="font-bold text-lg">${category.title}</span>
-                            <span class="task-count">${activeTasks.length}</span>
+                            <div class="flex items-center gap-2">
+                                <button class="manage-template-btn text-gray-400 hover:text-blue-500 text-sm" title="จัดการเทมเพลต"><i class="fa-solid fa-list-alt"></i></button>
+                                <button class="delete-category-btn text-gray-400 hover:text-red-500 text-sm" title="ลบประเภทงาน"><i class="fa-solid fa-trash-can"></i></button>
+                                <span class="task-count">${activeTasks.length}</span>
+                            </div>
                         </div>
                         <div class="task-list"></div>
                         <div class="completed-section-header mt-2 p-2 border-t cursor-pointer text-sm font-semibold text-gray-500 hover:text-gray-800">
@@ -2844,6 +2164,30 @@
           taskForm.querySelector(
             `input[name="status"][value="${task.status}"]`
           ).checked = true;
+
+          // NEW LOGIC: Disable "Completed" status if checklists are not done
+          const allChecklistItemsCompleted = (task.checklist || []).every(
+            (item) => item.completed
+          );
+          const completedRadio = taskForm.querySelector(
+            'input[name="status"][value="completed"]'
+          );
+          const completedLabel = completedRadio.closest("label");
+
+          if (
+            !allChecklistItemsCompleted &&
+            (task.checklist || []).length > 0
+          ) {
+            completedRadio.disabled = true;
+            completedLabel.classList.add("opacity-50", "cursor-not-allowed");
+            completedLabel.title =
+              'ต้องทำรายการในเช็คลิสต์ให้เสร็จทั้งหมดก่อน จึงจะเปลี่ยนสถานะเป็น "เสร็จสิ้น" ได้';
+          } else {
+            completedRadio.disabled = false;
+            completedLabel.classList.remove("opacity-50", "cursor-not-allowed");
+            completedLabel.title = "";
+          }
+
           taskModal.classList.remove("hidden");
         }
 
@@ -2852,6 +2196,15 @@
           modalTitle.textContent = "เพิ่มงานใหม่";
           editTaskIndicesInput.value = "";
           populateCategorySelect();
+          // NEW LOGIC: Enable the "Completed" radio button for new tasks
+          const completedRadio = taskForm.querySelector(
+            'input[name="status"][value="completed"]'
+          );
+          const completedLabel = completedRadio.closest("label");
+          completedRadio.disabled = false;
+          completedLabel.classList.remove("opacity-50", "cursor-not-allowed");
+          completedLabel.title = "";
+
           taskModal.classList.remove("hidden");
         }
 
@@ -2914,6 +2267,19 @@
               checklist: [],
               createdAt: new Date().toISOString(),
             };
+            // NEW LOGIC: Apply checklist template
+            const template = data.categories[catIndex].checklistTemplate;
+            if (template && template.length > 0) {
+              newTask.checklist = template.map((item) => ({
+                text: item.text,
+                description: item.description || "",
+                completed: false,
+                updates: [],
+                isUrgent: false,
+                startDate: "", // Start date will be empty for templates
+                dueDate: "",
+              }));
+            }
             if (status === "in-progress" || status === "completed") {
               newTask.startedAt = new Date().toISOString();
             }
@@ -2928,17 +2294,8 @@
         });
 
         function closeModal() {
-          taskModal.classList.add("hidden");
-          taskDetailModal.classList.add("hidden");
-          trashModal.classList.add("hidden");
-          newCategoryModal.classList.add("hidden");
-          completeChecklistItemModal.classList.add("hidden");
-          updateItemModal.classList.add("hidden");
-          editCompletionModal.classList.add("hidden");
-          editChecklistItemModal.classList.add("hidden");
-          summaryModal.classList.add("hidden");
-          printPreviewModal.classList.add("hidden");
-          notificationModal.classList.add("hidden");
+          const allModals = document.querySelectorAll(".modal");
+          allModals.forEach((modal) => modal.classList.add("hidden"));
         }
 
         function renderSidebarMenu() {
@@ -3015,7 +2372,11 @@
           e.preventDefault();
           const categoryName = newCategoryNameInput.value.trim();
           if (categoryName) {
-            data.categories.push({ title: categoryName, tasks: [] });
+            data.categories.push({
+              title: categoryName,
+              tasks: [],
+              checklistTemplate: [],
+            }); // Add checklistTemplate for new categories
             saveData();
             if (!taskModal.classList.contains("hidden")) {
               populateCategorySelect();
@@ -3158,6 +2519,13 @@
               (u) => u.type === "issue"
             ).length;
 
+            // MODIFIED: Display start and due date
+            const dateDisplay =
+              item.startDate && item.dueDate
+                ? `${item.startDate} &rarr; ${item.dueDate}`
+                : item.dueDate || "N/A";
+
+            // MODIFIED: Simplified action buttons, removed separate date edit button
             li.innerHTML = `
                         <div class="flex items-start gap-3">
                             <input type="checkbox" ${
@@ -3192,8 +2560,7 @@
                                    isOverdue
                                      ? "font-bold text-red-500"
                                      : "text-gray-500"
-                                 }">${item.dueDate || ""}</span>
-                                 <button class="edit-duedate-btn text-gray-400 hover:text-blue-500 w-6 h-6 flex items-center justify-center" title="แก้ไข Duedate"><i class="fa-solid fa-calendar-days"></i></button>
+                                 }">${dateDisplay}</span>
                              </div>
                             <div class="flex-shrink-0 flex items-center">
                                 <button class="edit-item-btn text-gray-400 hover:text-blue-500 w-6 h-6 flex items-center justify-center" title="แก้ไขรายการ"><i class="fa-solid fa-pencil"></i></button>
@@ -3279,10 +2646,10 @@
                 updateItemEl.className =
                   "pb-2 mb-2 border-b border-gray-200 last:border-b-0 last:pb-0 last:mb-0 relative pl-5";
                 updateItemEl.innerHTML = `
-                                <i class="fa-solid ${icon} absolute left-0 top-1"></i>
-                                ${contentHTML}
-                                ${attachmentsHTML}
-                                <p class="text-xs text-gray-400 mt-2">${prefix}: ${update.timestamp}</p>
+                                 <i class="fa-solid ${icon} absolute left-0 top-1"></i>
+                                 ${contentHTML}
+                                 ${attachmentsHTML}
+                                 <p class="text-xs text-gray-400 mt-2">${prefix}: ${update.timestamp}</p>
                              `;
                 updatesContainerEl.appendChild(updateItemEl);
               });
@@ -3316,8 +2683,10 @@
                 } else {
                   item.completed = false;
                   delete item.completionDetails;
+                  // NEW LOGIC: Reopen task if it was completed
                   if (task.status === "completed") {
                     task.status = "in-progress";
+                    delete task.completedAt; // Remove completed timestamp
                   }
                   saveData();
                   renderChecklist(task, catIndex, taskIndex);
@@ -3346,13 +2715,6 @@
                 openUpdateItemModal(catIndex, taskIndex, index);
               });
             }
-
-            li.querySelector(".edit-duedate-btn").addEventListener(
-              "click",
-              () => {
-                openEditCompletionModal(catIndex, taskIndex, index);
-              }
-            );
 
             const deleteBtn = li.querySelector(".delete-item-btn");
             if (deleteBtn) {
@@ -3437,6 +2799,7 @@
             }),
           };
 
+          // NEW LOGIC: Only complete task if all checklist items are done
           const allChecklistItemsCompleted = task.checklist.every(
             (ci) => ci.completed
           );
@@ -3459,6 +2822,11 @@
           document.getElementById("editChecklistItemText").value = item.text;
           document.getElementById("editChecklistItemDescription").value =
             item.description || "";
+          // MODIFIED: Populate date fields
+          document.getElementById("editChecklistItemStartDate").value =
+            item.startDate || "";
+          document.getElementById("editChecklistItemDueDate").value =
+            item.dueDate || "";
           editChecklistItemModal.classList.remove("hidden");
         }
 
@@ -3476,12 +2844,22 @@
           const newDescription = document
             .getElementById("editChecklistItemDescription")
             .value.trim();
+          // MODIFIED: Get new date values
+          const newStartDate = document.getElementById(
+            "editChecklistItemStartDate"
+          ).value;
+          const newDueDate = document.getElementById(
+            "editChecklistItemDueDate"
+          ).value;
 
           if (newText) {
             const task = data.categories[catIndex].tasks[taskIndex];
             const item = task.checklist[itemIndex];
             item.text = newText;
             item.description = newDescription;
+            // MODIFIED: Save new date values
+            item.startDate = newStartDate;
+            item.dueDate = newDueDate;
 
             saveData();
             closeModal();
@@ -3566,130 +2944,37 @@
           }
         });
 
-        function openEditCompletionModal(catIndex, taskIndex, itemIndex) {
-          const item =
-            data.categories[catIndex].tasks[taskIndex].checklist[itemIndex];
-          document.getElementById("editCompletionItemName").textContent =
-            item.text;
-          document.getElementById(
-            "editCompletionItemIndices"
-          ).value = `${catIndex},${taskIndex},${itemIndex}`;
-          document.getElementById("editCompletionDueDate").value =
-            item.dueDate || "";
-          document.getElementById("editCompletionDetailsText").value =
-            item.completionDetails?.text || "";
-          const currentAttachments =
-            document.getElementById("currentAttachments");
-          if (
-            item.completionDetails?.attachments &&
-            item.completionDetails.attachments.length > 0
-          ) {
-            currentAttachments.textContent =
-              "ไฟล์ปัจจุบัน: " +
-              item.completionDetails.attachments.map((f) => f.name).join(", ");
-          } else {
-            currentAttachments.textContent = "";
-          }
-          editCompletionModal.classList.remove("hidden");
-          editCompletionForm.reset();
-        }
-
-        cancelEditCompletionBtn.addEventListener("click", closeModal);
-
-        editCompletionForm.addEventListener("submit", async (e) => {
-          e.preventDefault();
-          const reason = document.getElementById("editReason").value.trim();
-          if (!reason) {
-            // Replace alert with a more user-friendly notification in a real app
-            console.error("Reason for edit is required.");
-            return;
-          }
-
-          const newDueDate = document.getElementById(
-            "editCompletionDueDate"
-          ).value;
-          const newDetailsText = document
-            .getElementById("editCompletionDetailsText")
-            .value.trim();
-          const newFiles = document.getElementById(
-            "editCompletionAttachments"
-          ).files;
-
-          const [catIndex, taskIndex, itemIndex] = document
-            .getElementById("editCompletionItemIndices")
-            .value.split(",")
-            .map(Number);
-          const task = data.categories[catIndex].tasks[taskIndex];
-          const item = task.checklist[itemIndex];
-
-          if (!item.completionDetails) item.completionDetails = {};
-          if (!item.completionDetails.editHistory) {
-            item.completionDetails.editHistory = [];
-          }
-
-          item.completionDetails.editHistory.push({
-            reason: reason,
-            oldDueDate: item.dueDate,
-            newDueDate: newDueDate,
-            timestamp: new Date().toLocaleString("th-TH", {
-              day: "2-digit",
-              month: "2-digit",
-              year: "numeric",
-              hour: "2-digit",
-              minute: "2-digit",
-            }),
-          });
-
-          item.dueDate = newDueDate;
-          item.completionDetails.text = newDetailsText;
-
-          if (newFiles.length > 0) {
-            const fileReadPromises = Array.from(newFiles).map((file) => {
-              return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = () =>
-                  resolve({
-                    name: file.name,
-                    type: file.type,
-                    url: reader.result,
-                  });
-                reader.onerror = (error) => reject(error);
-                reader.readAsDataURL(file);
-              });
-            });
-            item.completionDetails.attachments = await Promise.all(
-              fileReadPromises
-            );
-          }
-
-          saveData();
-          closeModal();
-          renderAll();
-          if (!taskDetailModal.classList.contains("hidden")) {
-            renderChecklist(task, catIndex, taskIndex);
-          }
-        });
-
         addChecklistItemForm.addEventListener("submit", (e) => {
           e.preventDefault();
           const textInput = document.getElementById("newChecklistItemText");
-          const dateInput = document.getElementById("newChecklistItemDueDate");
+          // MODIFIED: Get start date input
+          const startDateInput = document.getElementById(
+            "newChecklistItemStartDate"
+          );
+          const dueDateInput = document.getElementById(
+            "newChecklistItemDueDate"
+          );
           const descriptionInput = document.getElementById(
             "newChecklistItemDescription"
           );
+
           const text = textInput.value.trim();
-          const dueDate = dateInput.value;
+          const startDate = startDateInput.value;
+          const dueDate = dueDateInput.value;
           const description = descriptionInput.value.trim();
 
-          if (text) {
+          // Dates are now required by the HTML, so this check is simpler
+          if (text && startDate && dueDate) {
             const [catIndex, taskIndex] = detailTaskIndicesInput.value
               .split(",")
               .map(Number);
             const task = data.categories[catIndex].tasks[taskIndex];
             if (!task.checklist) task.checklist = [];
+            // MODIFIED: Save start date along with other data
             task.checklist.push({
               text,
               completed: false,
+              startDate,
               dueDate,
               description,
               updates: [],
@@ -3703,16 +2988,18 @@
         });
 
         function renderAgendaView() {
+          // Get all list elements
           const overdueList = document.getElementById("overdueList");
+          const startTodayList = document.getElementById("startTodayList");
           const dueTodayList = document.getElementById("dueTodayList");
+          const startTomorrowList =
+            document.getElementById("startTomorrowList");
           const dueTomorrowList = document.getElementById("dueTomorrowList");
-          const upcomingList = document.getElementById("upcomingList");
+          const startUpcomingList =
+            document.getElementById("startUpcomingList");
+          const dueUpcomingList = document.getElementById("dueUpcomingList");
 
-          overdueList.innerHTML = "";
-          dueTodayList.innerHTML = "";
-          dueTomorrowList.innerHTML = "";
-          upcomingList.innerHTML = "";
-
+          // Collect all non-completed checklist items from data
           let allChecklistItems = [];
           data.categories.forEach((cat, catIndex) => {
             (cat.tasks || []).forEach((task, taskIndex) => {
@@ -3729,104 +3016,158 @@
             });
           });
 
+          // Define time references
           const today = new Date();
           today.setHours(0, 0, 0, 0);
 
           const tomorrow = new Date(today);
           tomorrow.setDate(tomorrow.getDate() + 1);
 
+          // Filter items into categories
           const overdueItems = allChecklistItems.filter(
             (i) => i.dueDate && new Date(i.dueDate) < today
+          );
+
+          const startTodayItems = allChecklistItems.filter(
+            (i) =>
+              i.startDate &&
+              new Date(i.startDate).toDateString() === today.toDateString()
           );
           const dueTodayItems = allChecklistItems.filter(
             (i) =>
               i.dueDate &&
               new Date(i.dueDate).toDateString() === today.toDateString()
           );
+
+          const startTomorrowItems = allChecklistItems.filter(
+            (i) =>
+              i.startDate &&
+              new Date(i.startDate).toDateString() === tomorrow.toDateString()
+          );
           const dueTomorrowItems = allChecklistItems.filter(
             (i) =>
               i.dueDate &&
               new Date(i.dueDate).toDateString() === tomorrow.toDateString()
           );
-          const upcomingItems = allChecklistItems.filter(
+
+          const startUpcomingItems = allChecklistItems.filter(
+            (i) => i.startDate && new Date(i.startDate) > tomorrow
+          );
+          const dueUpcomingItems = allChecklistItems.filter(
             (i) => i.dueDate && new Date(i.dueDate) > tomorrow
           );
 
-          const sortByUrgencyAndDate = (a, b) => {
-            if (a.isUrgent && !b.isUrgent) return -1;
-            if (!a.isUrgent && b.isUrgent) return 1;
-            if (a.dueDate && b.dueDate)
-              return new Date(a.dueDate) - new Date(b.dueDate);
-            return 0;
-          };
-
-          const createAgendaItem = (item, listEl) => {
+          // Helper function to create a single list item element
+          const createAgendaItem = (item) => {
             const li = document.createElement("li");
             li.className =
-              "bg-white p-3 rounded-md shadow-sm flex items-center justify-between cursor-pointer hover:bg-gray-50";
-            let remainingText = "";
-            if (listEl === upcomingList) {
-              const diffTime = Math.abs(new Date(item.dueDate) - today);
-              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-              remainingText = `<span class="text-sm font-semibold text-gray-500">เหลือ ${diffDays} วัน</span>`;
-            }
+              "bg-white p-3 rounded-md shadow-sm cursor-pointer hover:bg-gray-50 transition-shadow";
+            const isItemOverdue =
+              item.dueDate && new Date(item.dueDate) < today;
+
             li.innerHTML = `
-                        <div>
-                            <p class="font-semibold">${
-                              item.isUrgent
-                                ? '<i class="fa-solid fa-fire text-red-500 mr-1"></i>'
+                        <div class="flex justify-between items-start">
+                            <div class="flex-grow pr-2">
+                                <p class="font-semibold">${
+                                  item.isUrgent
+                                    ? '<i class="fa-solid fa-fire text-red-500 mr-1"></i>'
+                                    : ""
+                                }${item.text}</p>
+                                <p class="text-sm text-gray-500 truncate">${
+                                  data.categories[item.catIndex].title
+                                }</p>
+                            </div>
+                            ${
+                              isItemOverdue
+                                ? `<span class="text-xs font-bold text-red-500 bg-red-100 px-2 py-1 rounded-full shrink-0">เกินกำหนด</span>`
                                 : ""
-                            }${item.text}</p>
-                            <p class="text-sm text-gray-500">${
-                              data.categories[item.catIndex].title
-                            } / ${item.taskContent}</p>
+                            }
                         </div>
-                        ${
-                          remainingText ||
-                          `<span class="text-sm font-bold ${
-                            listEl === overdueList
-                              ? "text-red-500"
-                              : "text-gray-600"
-                          }">${item.dueDate}</span>`
-                        }
+                        <div class="text-xs text-gray-600 mt-2 pt-2 border-t flex justify-between items-center gap-2">
+                            <span><strong>เริ่ม:</strong> <span class="font-medium text-gray-800">${
+                              item.startDate || "N/A"
+                            }</span></span>
+                            <span><strong>เสร็จ:</strong> <span class="font-medium ${
+                              isItemOverdue ? "text-red-600" : "text-gray-800"
+                            }">${item.dueDate || "N/A"}</span></span>
+                        </div>
                     `;
             li.addEventListener("click", () =>
               openDetailModal(item.catIndex, item.taskIndex)
             );
-            listEl.appendChild(li);
+            return li;
           };
 
-          if (overdueItems.length === 0)
-            overdueList.innerHTML =
-              '<p class="text-center text-sm text-gray-500">ไม่มีงานที่เกินกำหนด</p>';
-          else
-            overdueItems
-              .sort(sortByUrgencyAndDate)
-              .forEach((item) => createAgendaItem(item, overdueList));
+          // Helper function to populate a list
+          const populateAgendaList = (
+            items,
+            listEl,
+            sortByDateType,
+            emptyMessage
+          ) => {
+            listEl.innerHTML = "";
+            if (items.length === 0) {
+              listEl.innerHTML = `<li class="text-center text-sm text-gray-500 py-2">${emptyMessage}</li>`;
+              return;
+            }
+            const sortByUrgencyAndDate = (a, b) => {
+              if (a.isUrgent && !b.isUrgent) return -1;
+              if (!a.isUrgent && b.isUrgent) return 1;
+              if (a[sortByDateType] && b[sortByDateType])
+                return (
+                  new Date(a[sortByDateType]) - new Date(b[sortByDateType])
+                );
+              return 0;
+            };
 
-          if (dueTodayItems.length === 0)
-            dueTodayList.innerHTML =
-              '<p class="text-center text-sm text-gray-500">ไม่มีงานสำหรับวันนี้</p>';
-          else
-            dueTodayItems
-              .sort(sortByUrgencyAndDate)
-              .forEach((item) => createAgendaItem(item, dueTodayList));
+            items.sort(sortByUrgencyAndDate).forEach((item) => {
+              listEl.appendChild(createAgendaItem(item));
+            });
+          };
 
-          if (dueTomorrowItems.length === 0)
-            dueTomorrowList.innerHTML =
-              '<p class="text-center text-sm text-gray-500">ไม่มีงานสำหรับวันพรุ่งนี้</p>';
-          else
-            dueTomorrowItems
-              .sort(sortByUrgencyAndDate)
-              .forEach((item) => createAgendaItem(item, dueTomorrowList));
-
-          if (upcomingItems.length === 0)
-            upcomingList.innerHTML =
-              '<p class="text-center text-sm text-gray-500">ไม่มีงานอื่นๆ</p>';
-          else
-            upcomingItems
-              .sort(sortByUrgencyAndDate)
-              .forEach((item) => createAgendaItem(item, upcomingList));
+          // Populate all the lists on the agenda view
+          populateAgendaList(
+            overdueItems,
+            overdueList,
+            "dueDate",
+            "ไม่มีงานที่เกินกำหนด"
+          );
+          populateAgendaList(
+            startTodayItems,
+            startTodayList,
+            "startDate",
+            "ไม่มีงานที่ต้องเริ่มวันนี้"
+          );
+          populateAgendaList(
+            dueTodayItems,
+            dueTodayList,
+            "dueDate",
+            "ไม่มีงานที่ครบกำหนดวันนี้"
+          );
+          populateAgendaList(
+            startTomorrowItems,
+            startTomorrowList,
+            "startDate",
+            "ไม่มีงานที่ต้องเริ่มพรุ่งนี้"
+          );
+          populateAgendaList(
+            dueTomorrowItems,
+            dueTomorrowList,
+            "dueDate",
+            "ไม่มีงานที่ครบกำหนดพรุ่งนี้"
+          );
+          populateAgendaList(
+            startUpcomingItems,
+            startUpcomingList,
+            "startDate",
+            "ไม่มีงานที่ต้องเริ่ม"
+          );
+          populateAgendaList(
+            dueUpcomingItems,
+            dueUpcomingList,
+            "dueDate",
+            "ไม่มีงานที่ครบกำหนด"
+          );
         }
 
         // --- All other helper functions (drag&drop, file handling, etc.) remain unchanged ---
@@ -4000,7 +3341,42 @@
         });
 
         confirmPrintBtn.addEventListener("click", () => {
-          window.print();
+          const printContent =
+            document.getElementById("print-preview-area").innerHTML;
+          const printWindow = window.open("", "_blank");
+
+          printWindow.document.write(`
+                    <html>
+                        <head>
+                            <title>พิมพ์สรุปงาน</title>
+                            <script src="https://cdn.tailwindcss.com"><\/script>
+                            <link rel="preconnect" href="https://fonts.googleapis.com">
+                            <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+                            <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+                            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+                            <style>
+                                body { font-family: 'Kanit', sans-serif; padding: 1.5rem; }
+                                /* Additional print-specific styles can go here */
+                                .attachment-item a { color: #3b82f6 !important; text-decoration: none !important; }
+                                .attachment-item img { border: 1px solid #eee; }
+                            </style>
+                        </head>
+                        <body>
+                            ${printContent}
+                        </body>
+                    </html>
+                `);
+
+          printWindow.document.close(); // Important for the onload event to fire
+
+          printWindow.onload = function () {
+            // Give Tailwind's JIT compiler a moment to run after the document loads
+            setTimeout(function () {
+              printWindow.focus();
+              printWindow.print();
+              printWindow.close();
+            }, 250); // A short delay for JIT
+          };
         });
 
         cancelPreviewBtn.addEventListener("click", () => {
@@ -4009,35 +3385,6 @@
 
         closePreviewBtn.addEventListener("click", () => {
           printPreviewModal.classList.add("hidden");
-        });
-
-        copySummaryBtn.addEventListener("click", () => {
-          let summaryText = document.getElementById("summaryEditable").value;
-          const summaryAttachments =
-            document.getElementById("summaryAttachments").files;
-
-          if (summaryAttachments.length > 0) {
-            summaryText += "\n\n--- ไฟล์แนบเพิ่มเติม ---\n";
-            for (const file of summaryAttachments) {
-              summaryText += `- ${file.name}\n`;
-            }
-          }
-
-          navigator.clipboard.writeText(summaryText).then(() => {
-            const originalText = copySummaryBtn.innerHTML;
-            copySummaryBtn.innerHTML =
-              '<i class="fa-solid fa-check"></i> คัดลอกแล้ว';
-            copySummaryBtn.classList.add("bg-green-500", "hover:bg-green-600");
-            copySummaryBtn.classList.remove("bg-gray-500", "hover:bg-gray-600");
-            setTimeout(() => {
-              copySummaryBtn.innerHTML = originalText;
-              copySummaryBtn.classList.remove(
-                "bg-green-500",
-                "hover:bg-green-600"
-              );
-              copySummaryBtn.classList.add("bg-gray-500", "hover:bg-gray-600");
-            }, 2000);
-          });
         });
 
         const summaryAttachmentsInput =
@@ -4121,6 +3468,12 @@
         }
 
         function openSummaryModal(task, catIndex) {
+          // NEW LOGIC: Store the current task for export functions
+          currentTaskForSummary = {
+            ...task,
+            categoryTitle: data.categories[catIndex].title,
+          };
+
           // Header Info
           document.getElementById(
             "summaryModalTitle"
@@ -4465,6 +3818,462 @@
         backToDashboardBtn.addEventListener("click", () =>
           switchView("dashboard")
         );
+
+        // --- NEW FEATURE: Delete Category ---
+        kanbanBoard.addEventListener("click", (e) => {
+          const deleteBtn = e.target.closest(".delete-category-btn");
+          if (deleteBtn) {
+            const catIndex =
+              e.target.closest(".kanban-column").dataset.catIndex;
+            openDeleteCategoryModal(parseInt(catIndex));
+          }
+          const templateBtn = e.target.closest(".manage-template-btn");
+          if (templateBtn) {
+            const catIndex =
+              e.target.closest(".kanban-column").dataset.catIndex;
+            openTemplateModal(parseInt(catIndex));
+          }
+        });
+
+        function openDeleteCategoryModal(catIndex) {
+          const category = data.categories[catIndex];
+          const messageEl = document.getElementById("deleteCategoryMessage");
+          const confirmBtn = document.getElementById(
+            "confirmDeleteCategoryBtn"
+          );
+          document.getElementById("deleteCategoryIndex").value = catIndex;
+
+          if (category.tasks && category.tasks.length > 0) {
+            messageEl.innerHTML = `ไม่สามารถลบประเภทงาน "<strong>${category.title}</strong>" ได้ เนื่องจากยังมีงานอยู่ <strong>${category.tasks.length}</strong> งาน กรุณาย้ายหรือลบงานทั้งหมดก่อน`;
+            confirmBtn.disabled = true;
+            confirmBtn.classList.add("opacity-50", "cursor-not-allowed");
+          } else {
+            messageEl.innerHTML = `คุณแน่ใจหรือไม่ว่าต้องการลบประเภทงาน "<strong>${category.title}</strong>" การกระทำนี้ไม่สามารถย้อนกลับได้`;
+            confirmBtn.disabled = false;
+            confirmBtn.classList.remove("opacity-50", "cursor-not-allowed");
+          }
+          deleteCategoryModal.classList.remove("hidden");
+        }
+
+        deleteCategoryForm.addEventListener("submit", (e) => {
+          e.preventDefault();
+          const catIndex = parseInt(
+            document.getElementById("deleteCategoryIndex").value
+          );
+          data.categories.splice(catIndex, 1);
+          saveData();
+          closeModal();
+          renderAll();
+        });
+        cancelDeleteCategoryBtn.addEventListener("click", closeModal);
+
+        // --- NEW FEATURE: Checklist Template ---
+        function openTemplateModal(catIndex) {
+          const category = data.categories[catIndex];
+          document.getElementById(
+            "templateModalTitle"
+          ).textContent = `เทมเพลต: ${category.title}`;
+          document.getElementById("templateCategoryIndex").value = catIndex;
+          renderTemplateList(catIndex);
+          templateModal.classList.remove("hidden");
+        }
+
+        function renderTemplateList(catIndex) {
+          const listEl = document.getElementById("templateList");
+          const template = data.categories[catIndex].checklistTemplate || [];
+          listEl.innerHTML = "";
+          if (template.length === 0) {
+            listEl.innerHTML =
+              '<p class="text-center text-gray-500 text-sm">ยังไม่มีเทมเพลต</p>';
+            return;
+          }
+          template.forEach((item, itemIndex) => {
+            const itemEl = document.createElement("div");
+            itemEl.className =
+              "flex items-center justify-between bg-gray-100 p-2 rounded-md";
+            itemEl.innerHTML = `
+                        <span>${item.text}</span>
+                        <button data-item-index="${itemIndex}" class="delete-template-item-btn text-red-400 hover:text-red-600">&times;</button>
+                    `;
+            listEl.appendChild(itemEl);
+          });
+        }
+
+        addTemplateItemForm.addEventListener("submit", (e) => {
+          e.preventDefault();
+          const catIndex = parseInt(
+            document.getElementById("templateCategoryIndex").value
+          );
+          const textInput = document.getElementById("newTemplateItemText");
+          const text = textInput.value.trim();
+          if (text) {
+            if (!data.categories[catIndex].checklistTemplate) {
+              data.categories[catIndex].checklistTemplate = [];
+            }
+            data.categories[catIndex].checklistTemplate.push({ text });
+            saveData();
+            renderTemplateList(catIndex);
+            textInput.value = "";
+            textInput.focus();
+          }
+        });
+
+        document
+          .getElementById("templateList")
+          .addEventListener("click", (e) => {
+            const deleteBtn = e.target.closest(".delete-template-item-btn");
+            if (deleteBtn) {
+              const catIndex = parseInt(
+                document.getElementById("templateCategoryIndex").value
+              );
+              const itemIndex = parseInt(deleteBtn.dataset.itemIndex);
+              data.categories[catIndex].checklistTemplate.splice(itemIndex, 1);
+              saveData();
+              renderTemplateList(catIndex);
+            }
+          });
+
+        closeTemplateModalBtn.addEventListener("click", closeModal);
+
+        // --- NEW FEATURE: AI Smart Import ---
+        function openImportNotesModal() {
+          importNotesModal.classList.remove("hidden");
+          document
+            .getElementById("notes-input-view")
+            .classList.remove("hidden");
+          document.getElementById("notes-loading-view").classList.add("hidden");
+          document.getElementById("notes-review-view").classList.add("hidden");
+          document.getElementById("notesInput").value = "";
+        }
+
+        importNotesBtn.addEventListener("click", openImportNotesModal);
+        closeImportModalBtn.addEventListener("click", closeModal);
+        cancelImportBtn.addEventListener("click", closeModal);
+
+        importNotesForm.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const notes = document.getElementById("notesInput").value.trim();
+          if (!notes) return;
+
+          document.getElementById("notes-input-view").classList.add("hidden");
+          document
+            .getElementById("notes-loading-view")
+            .classList.remove("hidden");
+
+          try {
+            const tasks = await generateTasksFromNotes(notes);
+            renderNotesReview(tasks);
+          } catch (error) {
+            console.error("Error processing notes:", error);
+            // In a real app, show a user-friendly error message here
+            document
+              .getElementById("notes-input-view")
+              .classList.remove("hidden");
+          } finally {
+            document
+              .getElementById("notes-loading-view")
+              .classList.add("hidden");
+          }
+        });
+
+        confirmImportBtn.addEventListener("click", () => {
+          const reviewContainer = document.getElementById("ai-generated-tasks");
+          const taskElements =
+            reviewContainer.querySelectorAll(".ai-task-item");
+
+          taskElements.forEach((taskEl) => {
+            const taskContent = taskEl
+              .querySelector(".ai-task-content-input")
+              .value.trim();
+            if (!taskContent) return; // Skip if task name is empty
+
+            const checklistItems = Array.from(
+              taskEl.querySelectorAll(".ai-checklist-item")
+            );
+            const categoryIndex = parseInt(
+              taskEl.querySelector(".task-category-selector").value
+            );
+
+            if (isNaN(categoryIndex)) return;
+
+            const newChecklist = checklistItems
+              .map((itemLi) => {
+                const text = itemLi
+                  .querySelector(".ai-checklist-text-input")
+                  .value.trim();
+                // MODIFIED: Read start and due dates from AI modal
+                const startDate = itemLi.querySelector(
+                  ".ai-checklist-start-date-input"
+                ).value;
+                const dueDate = itemLi.querySelector(
+                  ".ai-checklist-date-input"
+                ).value;
+                if (!text) return null; // Skip empty checklist items
+                return {
+                  text: text,
+                  completed: false,
+                  startDate: startDate,
+                  dueDate: dueDate,
+                  description: "",
+                  updates: [],
+                  isUrgent: false,
+                };
+              })
+              .filter(Boolean); // remove null items
+
+            const newTask = {
+              content: taskContent,
+              assigner: "",
+              coordinator: "",
+              status: "pending",
+              isUrgent: false,
+              history: [],
+              isNew: true,
+              checklist: newChecklist,
+              createdAt: new Date().toISOString(),
+            };
+            data.categories[categoryIndex].tasks.push(newTask);
+          });
+
+          saveData();
+          closeModal();
+          renderAll();
+        });
+
+        // NEW: Event delegation for dynamically added buttons in review modal
+        document
+          .getElementById("ai-generated-tasks")
+          .addEventListener("click", (e) => {
+            // Handle delete checklist item
+            if (e.target.closest(".delete-ai-checklist-item-btn")) {
+              e.target.closest(".ai-checklist-item").remove();
+            }
+            // Handle add checklist item
+            if (e.target.closest(".add-ai-checklist-item-btn")) {
+              const list = e.target
+                .closest(".ai-task-item")
+                .querySelector(".ai-checklist-list");
+              const newItemEl = document.createElement("li");
+              newItemEl.className = "ai-checklist-item flex items-center gap-2";
+              // MODIFIED: Add start date input to new items in AI modal
+              newItemEl.innerHTML = `
+                        <input type="text" class="ai-checklist-text-input flex-grow shadow-sm border rounded py-1 px-2 text-sm" value="">
+                        <input type="date" class="ai-checklist-start-date-input shadow-sm border rounded py-1 px-2 text-sm" title="Start Date">
+                        <input type="date" class="ai-checklist-date-input shadow-sm border rounded py-1 px-2 text-sm" title="Due Date">
+                        <button type="button" class="delete-ai-checklist-item-btn text-red-400 hover:text-red-600 shrink-0">&times;</button>
+                    `;
+              list.appendChild(newItemEl);
+            }
+          });
+
+        function renderNotesReview(tasks) {
+          const reviewContainer = document.getElementById("ai-generated-tasks");
+          reviewContainer.innerHTML = "";
+
+          if (!tasks || tasks.length === 0) {
+            reviewContainer.innerHTML = `<p class="text-center text-gray-500 p-4">AI ไม่สามารถสร้างงานจากข้อความที่ให้ได้ ลองปรับแก้ข้อความและลองใหม่อีกครั้ง</p>`;
+            return;
+          }
+
+          tasks.forEach((task) => {
+            const taskEl = document.createElement("div");
+            taskEl.className = "ai-task-item bg-white p-4 rounded-lg border";
+
+            let checklistHTML = '<ul class="ai-checklist-list space-y-2 mt-2">';
+            task.checklist.forEach((item) => {
+              // MODIFIED: Added start and due date inputs for each AI-generated checklist item
+              checklistHTML += `
+                            <li class="ai-checklist-item flex items-center gap-2">
+                                <input type="text" class="ai-checklist-text-input flex-grow shadow-sm border rounded py-1 px-2 text-sm" value="${item}">
+                                <input type="date" class="ai-checklist-start-date-input shadow-sm border rounded py-1 px-2 text-sm" title="Start Date">
+                                <input type="date" class="ai-checklist-date-input shadow-sm border rounded py-1 px-2 text-sm" title="Due Date">
+                                <button type="button" class="delete-ai-checklist-item-btn text-red-400 hover:text-red-600 shrink-0">&times;</button>
+                            </li>
+                        `;
+            });
+            checklistHTML += "</ul>";
+
+            let categoryOptions = data.categories
+              .map(
+                (cat, catIndex) =>
+                  `<option value="${catIndex}">${cat.title}</option>`
+              )
+              .join("");
+
+            taskEl.innerHTML = `
+                        <div class="flex flex-col gap-2">
+                            <div class="flex justify-between items-center gap-2">
+                                <input type="text" class="ai-task-content-input font-bold text-lg text-gray-800 border-b-2 border-transparent focus:border-violet-400 focus:outline-none w-full" value="${task.content}">
+                                <select class="task-category-selector shadow-sm border rounded py-1 px-2 text-sm shrink-0">
+                                    ${categoryOptions}
+                                </select>
+                            </div>
+                            <div class="pl-2">
+                                ${checklistHTML}
+                                <button type="button" class="add-ai-checklist-item-btn text-sm text-blue-500 hover:text-blue-700 mt-2 flex items-center gap-1">
+                                    <i class="fa-solid fa-plus fa-xs"></i> เพิ่มรายการ
+                                </button>
+                            </div>
+                        </div>
+                    `;
+            reviewContainer.appendChild(taskEl);
+          });
+          document
+            .getElementById("notes-review-view")
+            .classList.remove("hidden");
+        }
+
+        async function generateTasksFromNotes(notes) {
+          const apiKey = "";
+          const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+
+          const systemPrompt =
+            "You are an intelligent task management assistant. Your goal is to analyze unstructured Thai text notes and convert them into a structured JSON format. The JSON should contain an array of tasks. Each task must have a `content` (a concise title for the task in Thai) and a `checklist` (an array of detailed, actionable steps in Thai). Identify distinct tasks and break them down into smaller sub-tasks for the checklist.";
+
+          const payload = {
+            contents: [{ parts: [{ text: notes }] }],
+            systemInstruction: { parts: [{ text: systemPrompt }] },
+            generationConfig: {
+              responseMimeType: "application/json",
+              responseSchema: {
+                type: "ARRAY",
+                items: {
+                  type: "OBJECT",
+                  properties: {
+                    content: { type: "STRING" },
+                    checklist: {
+                      type: "ARRAY",
+                      items: { type: "STRING" },
+                    },
+                  },
+                  required: ["content", "checklist"],
+                },
+              },
+            },
+          };
+
+          try {
+            const response = await fetch(apiUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            });
+
+            if (!response.ok) {
+              const errorBody = await response.text();
+              throw new Error(
+                `API request failed with status ${response.status}: ${errorBody}`
+              );
+            }
+
+            const result = await response.json();
+
+            if (
+              result.candidates &&
+              result.candidates[0].content &&
+              result.candidates[0].content.parts[0].text
+            ) {
+              const jsonText = result.candidates[0].content.parts[0].text;
+              return JSON.parse(jsonText);
+            } else {
+              console.error("Unexpected API response structure:", result);
+              return [];
+            }
+          } catch (error) {
+            console.error("Error calling Gemini API:", error);
+            throw error; // Re-throw to be caught by the caller
+          }
+        }
+
+        // --- NEW: Export and Print Logic for Single Task Summary ---
+        exportSummaryJsonBtn.addEventListener("click", exportSingleTaskAsJSON);
+        exportSummaryCsvBtn.addEventListener("click", exportSingleTaskAsCSV);
+
+        function exportSingleTaskAsJSON() {
+          if (!currentTaskForSummary) return;
+          const dataStr = JSON.stringify(currentTaskForSummary, null, 2);
+          const blob = new Blob([dataStr], { type: "application/json" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          const safeFileName = currentTaskForSummary.content
+            .substring(0, 20)
+            .replace(/[^a-z0-9]/gi, "_")
+            .toLowerCase();
+          a.href = url;
+          a.download = `task_${safeFileName}.json`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }
+
+        function exportSingleTaskAsCSV() {
+          if (!currentTaskForSummary) return;
+
+          let csvContent = "data:text/csv;charset=utf-8,\uFEFF"; // Add BOM
+          const header = [
+            "Category",
+            "Task Content",
+            "Task Status",
+            "Checklist Item",
+            "Checklist Start Date",
+            "Checklist Due Date",
+            "Checklist Status",
+          ];
+          csvContent += header.join(",") + "\r\n";
+
+          const escapeCSV = (str) => {
+            if (str === null || str === undefined) return "";
+            let result = String(str);
+            if (
+              result.includes(",") ||
+              result.includes('"') ||
+              result.includes("\n")
+            ) {
+              result = '"' + result.replace(/"/g, '""') + '"';
+            }
+            return result;
+          };
+
+          const task = currentTaskForSummary;
+          if (task.checklist && task.checklist.length > 0) {
+            task.checklist.forEach((item) => {
+              const row = [
+                escapeCSV(task.categoryTitle),
+                escapeCSV(task.content),
+                escapeCSV(task.status),
+                escapeCSV(item.text),
+                escapeCSV(item.startDate),
+                escapeCSV(item.dueDate),
+                item.completed ? "Completed" : "Pending",
+              ];
+              csvContent += row.join(",") + "\r\n";
+            });
+          } else {
+            const row = [
+              escapeCSV(task.categoryTitle),
+              escapeCSV(task.content),
+              escapeCSV(task.status),
+              "N/A",
+              "N/A",
+              "N/A",
+              "N/A",
+            ];
+            csvContent += row.join(",") + "\r\n";
+          }
+
+          const encodedUri = encodeURI(csvContent);
+          const link = document.createElement("a");
+          const safeFileName = currentTaskForSummary.content
+            .substring(0, 20)
+            .replace(/[^a-z0-9]/gi, "_")
+            .toLowerCase();
+          link.setAttribute("href", encodedUri);
+          link.setAttribute("download", `task_${safeFileName}.csv`);
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        }
 
         renderAll();
         showStartupNotification();
