@@ -1238,6 +1238,7 @@
         </div>
       </div>
     </div>
+    <!-- MODIFIED: Notification Modal -->
     <div
       id="notificationModal"
       class="modal fixed inset-0 bg-gray-600 bg-opacity-70 flex items-center justify-center hidden z-[70]"
@@ -1249,16 +1250,31 @@
           class="fa-solid fa-bell text-yellow-400 text-5xl mb-4 animate-bounce"
         ></i>
         <h2 class="text-2xl font-bold mb-4">การแจ้งเตือนประจำวัน</h2>
-        <div class="space-y-3 text-lg">
+        <div class="space-y-3 text-lg text-left px-4">
           <p>
-            คุณมี
+            <i class="fa-solid fa-fire text-red-500 w-6 text-center"></i> คุณมี
             <strong id="notificationUrgentCount" class="text-red-500">0</strong>
             งานด่วนที่ต้องจัดการ
           </p>
           <p>
+            <i
+              class="fa-solid fa-play-circle text-blue-500 w-6 text-center"
+            ></i>
+            มี
+            <strong id="notificationStartTodayCount" class="text-blue-500"
+              >0</strong
+            >
+            งานที่ต้องเริ่มทำวันนี้
+          </p>
+          <p>
+            <i
+              class="fa-solid fa-calendar-check text-green-500 w-6 text-center"
+            ></i>
             และมี
-            <strong id="notificationTodayCount" class="text-blue-500">0</strong>
-            งานที่ต้องทำวันนี้
+            <strong id="notificationDueTodayCount" class="text-green-500"
+              >0</strong
+            >
+            งานที่ต้องเสร็จวันนี้
           </p>
         </div>
         <div class="flex items-center justify-center gap-4 mt-6">
@@ -3652,6 +3668,7 @@
           summaryModal.classList.remove("hidden");
         }
 
+        // MODIFIED: Startup Notification Logic
         function showStartupNotification() {
           const today = new Date();
           today.setHours(0, 0, 0, 0);
@@ -3670,18 +3687,25 @@
           const urgentCount = allChecklistItems.filter(
             (i) => i.isUrgent
           ).length;
-          const todayCount = allChecklistItems.filter(
+          const startTodayCount = allChecklistItems.filter(
             (i) =>
-              !i.isUrgent &&
+              i.startDate &&
+              new Date(i.startDate).toDateString() === today.toDateString()
+          ).length;
+          const dueTodayCount = allChecklistItems.filter(
+            (i) =>
               i.dueDate &&
               new Date(i.dueDate).toDateString() === today.toDateString()
           ).length;
 
-          if (urgentCount > 0 || todayCount > 0) {
+          if (urgentCount > 0 || startTodayCount > 0 || dueTodayCount > 0) {
             document.getElementById("notificationUrgentCount").textContent =
               urgentCount;
-            document.getElementById("notificationTodayCount").textContent =
-              todayCount;
+            document.getElementById("notificationStartTodayCount").textContent =
+              startTodayCount;
+            document.getElementById("notificationDueTodayCount").textContent =
+              dueTodayCount;
+
             notificationModal.classList.remove("hidden");
             setTimeout(() => {
               notificationModal
