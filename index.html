@@ -30,22 +30,24 @@
         background-size: 20px 20px;
         overflow-x: hidden;
       }
+      /* -- Responsive Kanban Board -- */
       .main-content {
         overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
+        -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
         display: flex;
         align-items: flex-start;
       }
       .kanban-board {
         display: flex;
-        gap: 1.5rem;
-        padding: 1.5rem;
+        gap: 1.5rem; /* Default gap for larger screens */
+        padding: 1.5rem; /* Default padding */
         min-height: calc(100vh - 120px);
         align-items: flex-start;
         width: max-content;
       }
       .kanban-column {
-        flex: 0 0 350px;
+        width: 320px; /* A consistent width for columns on larger screens */
+        flex-shrink: 0; /* Prevent columns from shrinking */
         background-color: #eef2f5;
         border-radius: 12px;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
@@ -53,6 +55,19 @@
         display: flex;
         flex-direction: column;
         border-top: 4px solid;
+      }
+      /* On screens smaller than 640px (mobile) */
+      @media (max-width: 640px) {
+        .kanban-board {
+          gap: 1rem; /* Reduce gap */
+          padding: 1rem; /* Reduce padding */
+        }
+        .kanban-column {
+          width: 85vw; /* Make columns take up most of the viewport width */
+        }
+        .add-category-btn-kanban {
+          width: 85vw !important;
+        }
       }
       .column-header {
         padding: 1rem 1.25rem;
@@ -221,10 +236,10 @@
         border-left-color: #3b82f6;
       }
       .sidebar-menu a.active {
-        background-color: #eff6ff; /* blue-50 */
-        border-left-color: #3b82f6; /* blue-500 */
+        background-color: #eff6ff;
+        border-left-color: #3b82f6;
         font-weight: 600;
-        color: #2563eb; /* blue-600 */
+        color: #2563eb;
       }
       .sidebar-menu-header {
         font-weight: 600;
@@ -241,40 +256,6 @@
         gap: 0.5rem;
         color: #6b7280;
         font-size: 0.8rem;
-      }
-      .history-log {
-        max-height: 200px;
-        overflow-y: auto;
-        background-color: #f9fafb;
-        border-radius: 8px;
-        padding: 0.75rem;
-        margin-bottom: 1rem;
-        border: 1px solid #e5e7eb;
-      }
-      .history-item {
-        padding: 0.5rem;
-        border-bottom: 1px solid #f3f4f6;
-      }
-      .history-item:last-child {
-        border-bottom: none;
-      }
-      .history-meta {
-        font-size: 0.75rem;
-        color: #6b7280;
-        margin-bottom: 0.25rem;
-      }
-      .attachment-list {
-        list-style: none;
-        padding: 0.5rem 0 0 0;
-        margin: 0.5rem 0 0 0;
-        border-top: 1px dashed #e5e7eb;
-      }
-      .attachment-item a {
-        color: #3b82f6;
-        text-decoration: none;
-      }
-      .attachment-item a:hover {
-        text-decoration: underline;
       }
       .task-meta {
         display: grid;
@@ -307,20 +288,6 @@
         transform: rotate(-15deg);
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
         z-index: 10;
-      }
-      .view-toggle-btn {
-        background-color: transparent;
-        border: 1px solid #d1d5db;
-        color: #4b5563;
-        padding: 0.5rem 1rem;
-        border-radius: 0.5rem;
-        transition: all 0.2s ease-in-out;
-      }
-      .view-toggle-btn.active {
-        background-color: #3b82f6;
-        color: white;
-        border-color: #3b82f6;
-        box-shadow: 0 4px 6px rgba(59, 130, 246, 0.2);
       }
       .stat-card {
         background-color: white;
@@ -361,6 +328,17 @@
           transform: rotate(360deg);
         }
       }
+
+      /* Custom Toast Notification for copying link */
+      #toast-notification {
+        transition: transform 0.5s ease-in-out;
+        z-index: 100;
+      }
+      #toast-notification.show {
+        transform: translateX(0);
+      }
+
+      /* Print styles */
       @media print {
         body {
           background-image: none;
@@ -372,7 +350,8 @@
         .sidebar,
         header,
         .modal,
-        #connection-status {
+        #connection-status,
+        #toast-notification {
           display: none !important;
         }
         body * {
@@ -414,7 +393,6 @@
     </style>
   </head>
   <body>
-    <!-- NEW: Connection status bar -->
     <div
       id="connection-status"
       class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-3 text-center sticky top-0 z-30 text-sm font-medium"
@@ -423,6 +401,7 @@
       Real-time...
     </div>
 
+    <!-- Sidebar -->
     <aside id="sidebar" class="sidebar">
       <div class="p-4 flex justify-between items-center border-b">
         <h2 class="text-xl font-bold text-gray-800">เมนูนำทาง</h2>
@@ -442,45 +421,54 @@
       </div>
     </aside>
     <div id="sidebarOverlay" class="sidebar-overlay"></div>
+
+    <!-- Header -->
     <header
-      class="bg-white shadow-md p-4 flex justify-between items-center sticky top-0 z-20 no-print"
+      class="bg-white shadow-md p-3 sm:p-4 flex justify-between items-center sticky top-0 z-20 no-print"
     >
       <div class="flex items-center gap-4">
         <button id="openSidebarBtn" class="text-gray-600 hover:text-blue-500">
           <i class="fa-solid fa-bars fa-xl"></i>
         </button>
-        <h1 class="text-xl font-bold text-gray-800 hidden sm:block">
+        <h1 class="text-lg md:text-xl font-bold text-gray-800 hidden sm:block">
           ระบบจัดการงาน Real-time
         </h1>
       </div>
-      <div class="flex items-center gap-4">
-        <!-- NEW: Share Button -->
+      <!-- Responsive Header Buttons -->
+      <div class="flex items-center gap-2 sm:gap-4">
         <button
           id="shareBtn"
-          class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105 flex items-center gap-2"
+          title="แชร์บอร์ด"
+          class="bg-green-500 hover:bg-green-600 text-white font-bold w-10 h-10 sm:h-auto sm:w-auto sm:px-4 sm:py-2 rounded-lg shadow-md transition-transform transform hover:scale-105 flex items-center justify-center sm:gap-2"
         >
-          <i class="fa-solid fa-share-alt"></i> แชร์บอร์ด
+          <i class="fa-solid fa-share-alt"></i>
+          <span class="hidden sm:inline">แชร์บอร์ด</span>
         </button>
         <button
           id="importNotesBtn"
-          class="bg-violet-500 hover:bg-violet-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105 flex items-center gap-2"
+          title="นำเข้าอัจฉริยะ"
+          class="bg-violet-500 hover:bg-violet-600 text-white font-bold w-10 h-10 sm:h-auto sm:w-auto sm:px-4 sm:py-2 rounded-lg shadow-md transition-transform transform hover:scale-105 flex items-center justify-center sm:gap-2"
         >
-          <i class="fa-solid fa-wand-magic-sparkles"></i> นำเข้าอัจฉริยะ
+          <i class="fa-solid fa-wand-magic-sparkles"></i>
+          <span class="hidden sm:inline">นำเข้าอัจฉริยะ</span>
         </button>
         <button
           id="addTaskBtn"
-          class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105 flex items-center gap-2"
+          title="เพิ่มงานใหม่"
+          class="bg-blue-500 hover:bg-blue-600 text-white font-bold w-10 h-10 sm:h-auto sm:w-auto sm:px-4 sm:py-2 rounded-lg shadow-md transition-transform transform hover:scale-105 flex items-center justify-center sm:gap-2"
         >
-          <i class="fa-solid fa-plus"></i> เพิ่มงานใหม่
+          <i class="fa-solid fa-plus"></i>
+          <span class="hidden sm:inline">เพิ่มงานใหม่</span>
         </button>
       </div>
     </header>
 
     <main>
+      <!-- Dashboard View -->
       <div id="dashboardView">
-        <div class="p-6">
+        <div class="p-4 sm:p-6">
           <div
-            class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6"
+            class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6"
           >
             <div class="stat-card" data-filter="pending">
               <h3 class="text-gray-500 font-medium">รอดำเนินการ</h3>
@@ -505,7 +493,7 @@
               </p>
             </div>
           </div>
-          <div class="bg-white p-6 rounded-lg shadow-lg">
+          <div class="bg-white p-4 sm:p-6 rounded-lg shadow-lg">
             <h2 class="text-xl font-bold mb-4 text-gray-700">
               สัดส่วนประเภทงาน
             </h2>
@@ -513,9 +501,10 @@
           </div>
         </div>
       </div>
-      <div id="agendaView" class="hidden p-6 w-full">
+
+      <!-- Agenda View -->
+      <div id="agendaView" class="hidden p-4 sm:p-6 w-full">
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-          <!-- Overdue Column -->
           <div class="bg-red-50 border border-red-200 rounded-lg p-4">
             <h2
               class="text-lg font-bold text-red-700 flex items-center gap-2 mb-3"
@@ -524,7 +513,6 @@
             </h2>
             <ul id="overdueList" class="space-y-2"></ul>
           </div>
-          <!-- Today Column -->
           <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <h2
               class="text-lg font-bold text-blue-700 flex items-center gap-2 mb-3"
@@ -544,7 +532,6 @@
             </h3>
             <ul id="dueTodayList" class="space-y-2"></ul>
           </div>
-          <!-- Tomorrow Column -->
           <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
             <h2
               class="text-lg font-bold text-gray-700 flex items-center gap-2 mb-3"
@@ -591,20 +578,25 @@
           </div>
         </div>
       </div>
+
+      <!-- Kanban View -->
       <div id="kanbanView" class="hidden">
         <div class="main-content">
           <div id="kanbanBoard" class="kanban-board"></div>
-          <div class="p-6 self-start">
+          <div class="p-4 sm:p-6 self-start">
             <button
               id="addCategoryBtn"
-              class="bg-white/80 hover:bg-white text-gray-600 font-semibold py-2 px-4 rounded-lg shadow-md w-[350px] h-20 border-2 border-dashed border-gray-300 hover:border-blue-500 transition-all duration-200 flex items-center justify-center gap-2"
+              class="add-category-btn-kanban bg-white/80 hover:bg-white text-gray-600 font-semibold py-2 px-4 rounded-lg shadow-md h-20 border-2 border-dashed border-gray-300 hover:border-blue-500 transition-all duration-200 flex items-center justify-center gap-2"
+              style="width: 320px"
             >
               <i class="fa-solid fa-plus"></i> เพิ่มประเภทงานใหม่
             </button>
           </div>
         </div>
       </div>
-      <div id="filteredKanbanView" class="hidden p-6 w-full">
+
+      <!-- Filtered Kanban View -->
+      <div id="filteredKanbanView" class="hidden p-4 sm:p-6 w-full">
         <button
           id="backToDashboardBtn"
           class="mb-4 bg-white hover:bg-gray-100 text-gray-800 font-semibold py-2 px-4 border border-gray-300 rounded-lg shadow-sm flex items-center gap-2"
@@ -616,6 +608,7 @@
     </main>
 
     <!-- Modals -->
+    <!-- Task Form Modal -->
     <div
       id="taskModal"
       class="modal fixed inset-0 bg-gray-600 bg-opacity-50 hidden overflow-y-auto py-12"
@@ -769,11 +762,15 @@
         </form>
       </div>
     </div>
+
+    <!-- Task Detail Modal -->
     <div
       id="taskDetailModal"
       class="modal fixed inset-0 bg-gray-600 bg-opacity-50 hidden overflow-y-auto py-12"
     >
-      <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-2xl mx-auto">
+      <div
+        class="bg-white rounded-lg shadow-xl p-4 sm:p-6 w-full max-w-2xl mx-auto"
+      >
         <div class="flex justify-between items-center mb-2">
           <h2 class="text-xl font-bold text-gray-800" id="detailModalTitle">
             รายละเอียดงาน
@@ -810,7 +807,7 @@
           ></ul>
           <form id="addChecklistItemForm" class="space-y-2">
             <div>
-              <div class="flex items-center gap-2">
+              <div class="flex flex-wrap items-center gap-2">
                 <input
                   type="text"
                   id="newChecklistItemText"
@@ -818,7 +815,6 @@
                   placeholder="เพิ่มรายการใหม่..."
                   required
                 />
-                <!-- MODIFIED: Added Start Date and made both date inputs required -->
                 <input
                   type="date"
                   id="newChecklistItemStartDate"
@@ -854,6 +850,8 @@
         </div>
       </div>
     </div>
+
+    <!-- Trash Modal -->
     <div
       id="trashModal"
       class="modal fixed inset-0 bg-gray-600 bg-opacity-50 hidden overflow-y-auto py-12"
@@ -873,6 +871,8 @@
         <div id="trashList" class="max-h-[60vh] overflow-y-auto"></div>
       </div>
     </div>
+
+    <!-- Other Modals -->
     <div
       id="newCategoryModal"
       class="modal fixed inset-0 bg-gray-600 bg-opacity-70 flex items-center justify-center hidden"
@@ -1058,8 +1058,6 @@
         </form>
       </div>
     </div>
-    <!-- REMOVED: editCompletionModal is no longer needed -->
-    <!-- MODIFIED: editChecklistItemModal now includes date fields -->
     <div
       id="editChecklistItemModal"
       class="modal fixed inset-0 bg-gray-600 bg-opacity-70 flex items-center justify-center hidden z-[60]"
@@ -1255,7 +1253,6 @@
         </div>
       </div>
     </div>
-    <!-- MODIFIED: Notification Modal -->
     <div
       id="notificationModal"
       class="modal fixed inset-0 bg-gray-600 bg-opacity-70 flex items-center justify-center hidden z-[70]"
@@ -1294,23 +1291,24 @@
             งานที่ต้องเสร็จวันนี้
           </p>
         </div>
-        <div class="flex items-center justify-center gap-4 mt-6">
+        <div
+          class="flex flex-col sm:flex-row items-center justify-center gap-4 mt-6"
+        >
           <button
             id="closeNotificationBtn"
-            class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-6 rounded-lg"
+            class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-6 rounded-lg w-full sm:w-auto"
           >
             ปิด
           </button>
           <button
             id="goToAgendaBtn"
-            class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-6 rounded-lg flex items-center gap-2"
+            class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-6 rounded-lg flex items-center justify-center gap-2 w-full sm:w-auto"
           >
             <i class="fa-solid fa-calendar-day"></i> ไปที่ตารางงาน
           </button>
         </div>
       </div>
     </div>
-    <!-- NEW MODAL for Deleting Category -->
     <div
       id="deleteCategoryModal"
       class="modal fixed inset-0 bg-gray-600 bg-opacity-70 flex items-center justify-center hidden z-50"
@@ -1342,7 +1340,6 @@
         </form>
       </div>
     </div>
-    <!-- NEW MODAL for Checklist Templates -->
     <div
       id="templateModal"
       class="modal fixed inset-0 bg-gray-600 bg-opacity-70 flex items-center justify-center hidden z-50"
@@ -1381,7 +1378,6 @@
         ></div>
       </div>
     </div>
-    <!-- NEW: AI Smart Import Modal -->
     <div
       id="importNotesModal"
       class="modal fixed inset-0 bg-gray-600 bg-opacity-50 hidden overflow-y-auto py-12 z-[60]"
@@ -1401,8 +1397,6 @@
             &times;
           </button>
         </div>
-
-        <!-- View 1: Input -->
         <div id="notes-input-view">
           <p class="text-gray-600 mb-4">
             วางโน้ตหรือข้อความที่ต้องการสร้างเป็นงานด้านล่างนี้ AI
@@ -1413,31 +1407,22 @@
               id="notesInput"
               rows="10"
               class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-violet-400"
-              placeholder="ตัวอย่าง:
-- ประชุมทีม RCOT วันที่ 7-9 ต.ค.
-- แจ้งเรื่อง Workshop ให้พี่ผึ้งภายใน 15 ก.ย.
-- ติดตามเรื่องลงทะเบียน
-- เตรียมบูธ TSVIR ส่งข้อมูลให้ SV และจัดของ..."
+              placeholder="ตัวอย่าง: - ประชุมทีม RCOT วันที่ 7-9 ต.ค. - แจ้งเรื่อง Workshop ให้พี่ผึ้งภายใน 15 ก.ย. - ติดตามเรื่องลงทะเบียน - เตรียมบูธ TSVIR ส่งข้อมูลให้ SV และจัดของ..."
             ></textarea>
             <div class="mt-4 flex justify-end">
               <button
                 type="submit"
                 class="bg-violet-500 hover:bg-violet-600 text-white font-bold py-2 px-5 rounded-lg flex items-center gap-2"
               >
-                <i class="fa-solid fa-brain"></i>
-                ประมวลผล
+                <i class="fa-solid fa-brain"></i> ประมวลผล
               </button>
             </div>
           </form>
         </div>
-
-        <!-- View 2: Loading -->
         <div id="notes-loading-view" class="hidden text-center py-10">
           <div class="loader mx-auto"></div>
           <p class="mt-4 text-gray-600">AI กำลังวิเคราะห์ข้อมูลของคุณ...</p>
         </div>
-
-        <!-- View 3: Review & Confirm -->
         <div id="notes-review-view" class="hidden">
           <p class="text-gray-600 mb-4">
             นี่คืองานที่ AI สร้างจากโน้ตของคุณ
@@ -1446,9 +1431,7 @@
           <div
             id="ai-generated-tasks"
             class="space-y-4 max-h-[50vh] overflow-y-auto p-2 bg-gray-50 rounded-lg"
-          >
-            <!-- AI generated tasks will be injected here -->
-          </div>
+          ></div>
           <div class="mt-6 flex justify-end gap-3">
             <button
               id="cancelImportBtn"
@@ -1462,45 +1445,54 @@
               type="button"
               class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-5 rounded-lg flex items-center gap-2"
             >
-              <i class="fa-solid fa-check-circle"></i>
-              ยืนยันและเพิ่มงาน
+              <i class="fa-solid fa-check-circle"></i> ยืนยันและเพิ่มงาน
             </button>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- The entire script is now a module to handle Firebase integration -->
+    <!-- Toast Notification Area -->
+    <div
+      id="toast-notification"
+      class="fixed top-5 right-5 bg-green-500 text-white py-2 px-4 rounded-lg shadow-lg transform translate-x-[150%]"
+    >
+      <!-- Message is injected here -->
+    </div>
+
     <script type="module">
-      // NEW: Import Firebase modules
+      // Import Firebase modules
       import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
       import {
         getAuth,
         signInAnonymously,
+        signInWithCustomToken,
+        onAuthStateChanged,
       } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
       import {
         getFirestore,
         doc,
         onSnapshot,
         setDoc,
+        setLogLevel,
       } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
       // =========================================================================================
-      // === ที่ต้องแก้ไข: FIREBASE CONFIGURATION ====================================================
+      // === FIREBASE & APP CONFIGURATION ========================================================
       // =========================================================================================
-      // 1. ไปที่ https://console.firebase.google.com/ และสร้างโปรเจกต์ใหม่
-      // 2. ในโปรเจกต์ของคุณ, สร้าง Web App และคัดลอก Firebase configuration มาวางที่นี่
-      // 3. ไปที่เมนู Firestore Database > สร้างฐานข้อมูล (ในโหมด Test เพื่อให้เขียนอ่านได้ง่าย)
-      // 4. ระบบพร้อมใช้งาน!
-      const firebaseConfig = {
-        apiKey: "AIzaSyDlL0Xu_QJFpB_xkrJgYZBAIwjYPqGgsTM",
-        authDomain: "task-management-598df.firebaseapp.com",
-        projectId: "task-management-598df",
-        storageBucket: "task-management-598df.appspot.com",
-        messagingSenderId: "911087194691",
-        appId: "1:911087194691:web:b5fe9631111b6d3a26baf6",
+      const appId =
+        typeof __app_id !== "undefined" ? __app_id : "default-app-id";
+      const firebaseConfig = JSON.parse(
+        typeof __firebase_config !== "undefined" ? __firebase_config : "null"
+      ) || {
+        // This is a fallback config. It's recommended to provide the config via __firebase_config.
+        apiKey: "AIzaSy...",
+        authDomain: "your-project-id.firebaseapp.com",
+        projectId: "your-project-id",
+        storageBucket: "your-project-id.appspot.com",
+        messagingSenderId: "...",
+        appId: "...",
       };
-      // =========================================================================================
 
       const initialData = {
         categories: [
@@ -1510,6 +1502,7 @@
         ],
         trash: [],
       };
+      // =========================================================================================
 
       const COLORS = [
         "#3b82f6",
@@ -1522,7 +1515,7 @@
         "#ec4899",
       ];
 
-      // --- All Element Selectors ---
+      // --- Element Selectors ---
       const kanbanBoard = document.getElementById("kanbanBoard");
       const taskModal = document.getElementById("taskModal");
       const trashModal = document.getElementById("trashModal");
@@ -1640,13 +1633,15 @@
       const shareBtn = document.getElementById("shareBtn");
       const connectionStatus = document.getElementById("connection-status");
 
-      let data = initialData; // Start with initial data, will be replaced by Firestore
+      let data = {};
       let draggedItem = null;
       let taskChart = null;
       let currentTaskForSummary = null;
       let unsubscribe; // To hold the listener function for cleanup
 
-      // --- NEW: Firebase Initialization and Data Handling ---
+      let db, auth;
+
+      // --- Firebase Initialization and Data Handling ---
       let boardId = window.location.hash.substring(1);
       if (!boardId) {
         boardId =
@@ -1658,66 +1653,23 @@
 
       try {
         const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        const auth = getAuth(app);
-        const boardRef = doc(db, "boards", boardId);
+        db = getFirestore(app);
+        auth = getAuth(app);
+        setLogLevel("debug");
 
-        signInAnonymously(auth)
-          .then(() => {
-            console.log("Signed in anonymously.");
-
-            // Real-time listener
-            unsubscribe = onSnapshot(boardRef, (docSnap) => {
-              if (docSnap.exists()) {
-                data = docSnap.data().content;
-                console.log("Board data loaded/updated from Firestore.");
-              } else {
-                console.log("No such board! Creating a new one in Firestore.");
-                data = initialData;
-                saveData(); // Create the initial document
-              }
-
-              // Once data is loaded or initialized, render everything
-              renderAll();
-              connectionStatus.innerHTML = `<i class="fa-solid fa-check-circle mr-2"></i>เชื่อมต่อ Real-time สำเร็จ! แชร์ลิงก์นี้เพื่อทำงานร่วมกัน`;
-              connectionStatus.classList.replace(
-                "bg-yellow-100",
-                "bg-green-100"
-              );
-              connectionStatus.classList.replace(
-                "border-yellow-500",
-                "border-green-500"
-              );
-              connectionStatus.classList.replace(
-                "text-yellow-700",
-                "text-green-700"
-              );
-            });
-          })
-          .catch((error) => {
-            console.error("Anonymous sign-in failed:", error);
-            let errorMessage = "การเชื่อมต่อล้มเหลว: ไม่สามารถ Sign-in ได้";
-            if (error.code === "auth/api-key-not-valid") {
-              errorMessage =
-                "การเชื่อมต่อล้มเหลว: API Key ไม่ถูกต้อง! กรุณาตรวจสอบค่า `firebaseConfig` ในโค้ด";
-            } else if (error.code === "auth/admin-restricted-operation") {
-              errorMessage =
-                "การเชื่อมต่อล้มเหลว: กรุณาไปที่ Firebase Console > Authentication > Sign-in method แล้วเปิดใช้งาน Anonymous sign-in";
-            }
-            connectionStatus.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-2"></i>${errorMessage}`;
-            connectionStatus.classList.replace("bg-yellow-100", "bg-red-100");
-            connectionStatus.classList.replace(
-              "border-yellow-500",
-              "border-red-500"
-            );
-            connectionStatus.classList.replace(
-              "text-yellow-700",
-              "text-red-700"
-            );
-          });
+        onAuthStateChanged(auth, (user) => {
+          if (user) {
+            // User is authenticated, now we can listen to data
+            if (unsubscribe) unsubscribe(); // Detach any old listener
+            listenToBoardData();
+          } else {
+            // No user, attempt to sign in
+            signInUser();
+          }
+        });
       } catch (error) {
         console.error("Firebase Initialization Error:", error);
-        connectionStatus.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-2"></i>การเชื่อมต่อล้มเหลว: กรุณาตรวจสอบ Firebase Config ในโค้ด`;
+        connectionStatus.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-2"></i>การเชื่อมต่อล้มเหลว: กรุณาตรวจสอบ Firebase Config`;
         connectionStatus.classList.replace("bg-yellow-100", "bg-red-100");
         connectionStatus.classList.replace(
           "border-yellow-500",
@@ -1726,26 +1678,109 @@
         connectionStatus.classList.replace("text-yellow-700", "text-red-700");
       }
 
-      // MODIFIED: saveData now writes to Firestore
+      async function signInUser() {
+        try {
+          if (
+            typeof __initial_auth_token !== "undefined" &&
+            __initial_auth_token
+          ) {
+            await signInWithCustomToken(auth, __initial_auth_token);
+          } else {
+            await signInAnonymously(auth);
+          }
+        } catch (error) {
+          console.error("Authentication failed:", error);
+          let errorMessage = "การเชื่อมต่อล้มเหลว: ไม่สามารถ Sign-in ได้";
+          if (error.code) {
+            switch (error.code) {
+              case "auth/api-key-not-valid":
+                errorMessage =
+                  "การเชื่อมต่อล้มเหลว: API Key ไม่ถูกต้อง! กรุณาตรวจสอบค่า `firebaseConfig`";
+                break;
+              case "auth/admin-restricted-operation":
+                errorMessage =
+                  "การเชื่อมต่อล้มเหลว: กรุณาเปิดใช้งาน Anonymous sign-in ใน Firebase Console";
+                break;
+            }
+          }
+          connectionStatus.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-2"></i>${errorMessage}`;
+          connectionStatus.classList.replace("bg-yellow-100", "bg-red-100");
+          connectionStatus.classList.replace(
+            "border-yellow-500",
+            "border-red-500"
+          );
+          connectionStatus.classList.replace("text-yellow-700", "text-red-700");
+        }
+      }
+
+      function listenToBoardData() {
+        const boardRef = doc(
+          db,
+          "artifacts",
+          appId,
+          "public",
+          "data",
+          "boards",
+          boardId
+        );
+        unsubscribe = onSnapshot(
+          boardRef,
+          (docSnap) => {
+            if (docSnap.exists()) {
+              data = docSnap.data().content;
+            } else {
+              console.log("No such board! Creating a new one in Firestore.");
+              data = initialData;
+              saveData(); // Create the initial document
+            }
+            renderAll();
+            connectionStatus.innerHTML = `<i class="fa-solid fa-check-circle mr-2"></i>เชื่อมต่อ Real-time สำเร็จ! แชร์ลิงก์นี้เพื่อทำงานร่วมกัน`;
+            connectionStatus.classList.replace("bg-yellow-100", "bg-green-100");
+            connectionStatus.classList.replace(
+              "border-yellow-500",
+              "border-green-500"
+            );
+            connectionStatus.classList.replace(
+              "text-yellow-700",
+              "text-green-700"
+            );
+          },
+          (error) => {
+            console.error("Firestore listener error:", error);
+            connectionStatus.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-2"></i>เกิดข้อผิดพลาด: ${error.message}`;
+            connectionStatus.classList.replace("bg-yellow-100", "bg-red-100");
+          }
+        );
+      }
+
+      // MODIFIED: saveData now writes to Firestore using the correct path
       async function saveData() {
-        if (!boardId) {
-          console.error("Board ID is not set. Cannot save data.");
+        if (!boardId || !auth.currentUser) {
+          console.error("Board ID or user auth is not set. Cannot save data.");
           return;
         }
         try {
-          const db = getFirestore();
-          const boardRef = doc(db, "boards", boardId);
-          // Wrap the data in a 'content' field for structure
+          const boardRef = doc(
+            db,
+            "artifacts",
+            appId,
+            "public",
+            "data",
+            "boards",
+            boardId
+          );
           await setDoc(boardRef, { content: data });
-          // No need to log here, onSnapshot will confirm the update
         } catch (error) {
           console.error("Error saving data to Firestore: ", error);
         }
       }
 
-      // --- Core Functions (mostly unchanged) ---
+      // --- Core Rendering Functions ---
       function renderAll() {
-        if (!data) return; // Prevent rendering if data is not yet loaded
+        if (!data || !data.categories) {
+          console.log("Data is not ready for rendering.");
+          return;
+        }
         renderBoard();
         renderDashboard();
         renderSidebarMenu();
@@ -1754,7 +1789,16 @@
         }
       }
 
-      // --- All other functions (renderDashboard, renderBoard, modals, etc.) remain the same ---
+      function showToast(message) {
+        const toast = document.getElementById("toast-notification");
+        toast.textContent = message;
+        toast.classList.add("show");
+        setTimeout(() => {
+          toast.classList.remove("show");
+        }, 3000);
+      }
+
+      // --- All other functions (renderDashboard, renderBoard, modals, etc.) remain largely the same, but are included below for completeness ---
 
       taskDetailModal.addEventListener("click", (e) => {
         const downloadBtn = e.target.closest(".download-attachment-btn");
@@ -2690,7 +2734,6 @@
 
       cancelCompleteChecklistItemBtn.addEventListener("click", () => {
         closeModal();
-        // Since this modal is opened from a checkbox, we need to uncheck it if cancelled
         const [catIndex, taskIndex, itemIndex] = document
           .getElementById("completeChecklistItemIndices")
           .value.split(",")
@@ -2905,7 +2948,6 @@
         }
       });
 
-      // The rest of the functions... (All of them are pure functions or depend on `data` which is now reactive)
       function renderAgendaView() {
         const overdueList = document.getElementById("overdueList");
         const startTodayList = document.getElementById("startTodayList");
@@ -3079,6 +3121,7 @@
         );
       }
 
+      // --- Helper & Utility Functions ---
       function formatTaskContent(content) {
         return content
           .replace(
@@ -3194,6 +3237,7 @@
         ).element;
       }
 
+      // --- Summary & Print Functions ---
       printSummaryBtn.addEventListener("click", () => {
         const [catIndex, taskIndex] = detailTaskIndicesInput.value
           .split(",")
@@ -3282,7 +3326,6 @@
       cancelPreviewBtn.addEventListener("click", () => {
         printPreviewModal.classList.add("hidden");
       });
-
       closePreviewBtn.addEventListener("click", () => {
         printPreviewModal.classList.add("hidden");
       });
@@ -3546,8 +3589,13 @@
       }
 
       function showStartupNotification() {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        const lastShown = localStorage.getItem("notificationLastShown");
+        const today = new Date().toDateString();
+
+        if (lastShown === today) return; // Don't show again today
+
+        const todayDate = new Date();
+        todayDate.setHours(0, 0, 0, 0);
 
         let allChecklistItems = [];
         if (data && data.categories) {
@@ -3566,12 +3614,12 @@
         const startTodayCount = allChecklistItems.filter(
           (i) =>
             i.startDate &&
-            new Date(i.startDate).toDateString() === today.toDateString()
+            new Date(i.startDate).toDateString() === todayDate.toDateString()
         ).length;
         const dueTodayCount = allChecklistItems.filter(
           (i) =>
             i.dueDate &&
-            new Date(i.dueDate).toDateString() === today.toDateString()
+            new Date(i.dueDate).toDateString() === todayDate.toDateString()
         ).length;
 
         if (urgentCount > 0 || startTodayCount > 0 || dueTodayCount > 0) {
@@ -3588,6 +3636,8 @@
               .querySelector("div")
               .classList.remove("scale-95", "opacity-0");
           }, 10);
+
+          localStorage.setItem("notificationLastShown", today);
         }
       }
 
@@ -4147,7 +4197,6 @@
         document.body.removeChild(link);
       }
 
-      // --- NEW: Event listener for Share Button
       shareBtn.addEventListener("click", () => {
         const urlToCopy = window.location.href;
         const textArea = document.createElement("textarea");
@@ -4156,22 +4205,20 @@
         textArea.select();
         try {
           document.execCommand("copy");
-          shareBtn.innerHTML = '<i class="fa-solid fa-check"></i> คัดลอกแล้ว!';
+          showToast("คัดลอกลิงก์สำหรับแชร์แล้ว!");
         } catch (err) {
           console.error("Fallback: Oops, unable to copy", err);
-          alert(
-            "ไม่สามารถคัดลอกได้ กรุณาคัดลอก URL จากแถบที่อยู่ของเบราว์เซอร์"
-          );
+          // Fallback for browsers that don't support execCommand
+          showToast("ไม่สามารถคัดลอกได้");
         }
         document.body.removeChild(textArea);
-        setTimeout(() => {
-          shareBtn.innerHTML =
-            '<i class="fa-solid fa-share-alt"></i> แชร์บอร์ด';
-        }, 2000);
       });
 
-      // The first render is now triggered by the Firebase onSnapshot listener
-      showStartupNotification();
+      // Initial setup on window load
+      window.onload = () => {
+        // The first render is now triggered by the Firebase onSnapshot listener
+        setTimeout(showStartupNotification, 1500); // Delay notification check slightly
+      };
     </script>
   </body>
 </html>
